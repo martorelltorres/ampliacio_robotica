@@ -13,28 +13,72 @@ tres sistemes operatius. Tres stacks, un per pràctica de laboratori:
 
 ### PL0 — Introducció a ROS
 
-Fa servir `turtlesim` i les eines estàndard de ROS Noetic (`rqt_graph`, `rqt_plot`, `rosbag`,
-`rviz`...), ja incloses a la imatge base. No necessita res addicional.
+No afegeix res a la imatge: fa servir `turtlesim` i les eines estàndard de ROS Noetic, que la
+pràctica t'ensenya a fer servir una a una.
+
+| Eina | Per a què serveix |
+|---|---|
+| `roscore` | Arrenca el màster: el registre central que permet que els nodes es trobin entre ells. |
+| `turtlesim` | Simulador 2D de joguina (una tortuga que es mou en una finestra). És el «robot» sobre el qual practiques publicar en topics, cridar serveis i llegir paràmetres sense muntar res complex. |
+| `rosnode`, `rostopic`, `rosservice`, `rosparam`, `rosmsg`/`rossrv` | Inspecció des de la terminal: quins nodes hi ha, quins topics i de quin tipus, quins serveis, què val cada paràmetre. |
+| `rqt_graph` | Dibuixa el graf de nodes i les connexions per topic. La primera eina per veure per què «no passa res». |
+| `rqt_plot` | Grafica en temps real qualsevol camp numèric d'un topic (p. ex. `/turtle1/pose/x`). |
+| `rqt_console` | Visor de logs, filtrable per nivell i per node. |
+| `rosbag` | Enregistra topics a un fitxer i els reprodueix després, com si el robot hi fos. És la base de tot el treball *offline* de robòtica marina, i s'usa a PL1 i PL2. |
+| `roslaunch` | Arrenca un sistema sencer (nodes, paràmetres, remapatges) des d'un sol fitxer `.launch`. |
+| `roswtf` | Revisió automàtica de problemes de configuració. |
 
 ### PL1 — Odometria en robots amb rodes (Kobuki)
 
-| Component | Què és |
+El Kobuki és una base de tracció diferencial de Yujin Robot (encoders a les dues rodes, IMU
+integrada, para-xocs). Noetic només en publica mitja pila per `apt`, així que la imatge
+compila la resta des del codi font. El robot físic i el model simulat exposen **exactament la
+mateixa interfície ROS**: el teu codi de PL1 no canvia entre l'un i l'altre.
+
+| Paquet (repo) | Què fa |
 |---|---|
-| `kobuki`, `kobuki_core`, `kobuki_msgs` | Driver ROS del Kobuki (`kobuki_node`, `kobuki_keyop`) |
-| `kobuki_desktop` | Model simulat a Gazebo, mateixa interfície ROS que el robot físic |
-| `yocs_cmd_vel_mux`, `yocs_velocity_smoother` | Multiplexatge i suavitzat de velocitat que fa servir el driver |
+| `kobuki_core` | Biblioteca C++ **sense ROS**: parla el protocol sèrie amb el firmware de la base, empaqueta i desempaqueta les trames de sensors i d'ordres, i calcula l'odometria de tracció diferencial a partir dels encoders. És la peça que `kobuki_node` embolcalla. |
+| `kobuki` (metapaquet) | La capa ROS del robot. En surt `kobuki_node`, el **driver**: publica `/odom` (`nav_msgs/Odometry`), `/joint_states` i `/mobile_base/sensors/imu_data`, i se subscriu a `/mobile_base/commands/velocity` (`geometry_msgs/Twist`). No genera cap executable propi — es carrega com a *nodelet* (`kobuki_node/KobukiNodelet`, vegeu `minimal.launch`). També hi ha `kobuki_keyop` (teleoperació per teclat) i `kobuki_description` (URDF del robot). |
+| `kobuki_msgs` | Tipus de missatge propis del Kobuki: `BumperEvent` (para-xocs), `SensorState`, `ButtonEvent`, `Led`, `Sound`... |
+| `kobuki_desktop` | El costat de **simulació**. `kobuki_gazebo` porta el món i el launch `kobuki_playground.launch` (l'àlies `kobuki_sim`); `kobuki_gazebo_plugins` és el plugin de Gazebo (`libgazebo_ros_kobuki.so`) que dona al model simulat la mateixa interfície ROS que el driver real. |
+| `yocs_cmd_vel_mux` | Multiplexor d'ordres de velocitat: quan diverses fonts (teclat, navegació, seguretat) volen enviar `cmd_vel` alhora, dona pas a una sola segons prioritat. |
+| `yocs_velocity_smoother` | Limita l'acceleració i el *jerk* de les ordres de velocitat perquè el robot no faci estrebades. |
+| `yocs_controllers` | Classe base de controlador que fan servir els dos `yocs_*` anteriors. |
+
+> `apt` també aporta les biblioteques `ecl_*` de Yujin (utilitats de baix nivell sobre les
+> quals es construeix `kobuki_core`) i `nodelet` (el mecanisme amb què s'executa el driver).
+> Els altres paquets de `yujin_ocs` i `kobuki` (dashboards, tutorials, app manager,
+> `kobuki_qtestsuite`) s'exclouen amb `CATKIN_IGNORE`: el curs no els fa servir.
 
 ### PL2 — Navegació per estima submarina (COLA2 + Stonefish)
 
-| Component | Què és |
+COLA2 és l'arquitectura de control per capes (navegació · control · guiat · seguretat) que
+fan servir els AUV del grup. Tot es compila des del codi font (repos `github.com/srv`, fixats
+a commit). PL2 treballa sobre la **capa de navegació**: reconstruir la pose del vehicle
+integrant la velocitat respecte al fons (DVL) i l'orientació (IMU), normalment sobre un
+rosbag.
+
+| Paquet (repo) | Què fa |
 |---|---|
-| `cola2_lib` | Biblioteca C++ base del SRV (compilada des del codi font) |
-| `Stonefish` | Simulador submarí: dinàmica amb Bullet Physics, sensors i render OpenGL |
-| `cola2_msgs`, `cola2_lib_ros` | Missatges i utilitats ROS de COLA2 |
-| `cola2_core` | Control, navegació, seguretat, log, comms i simulació |
-| `sparus2_description`, `cola2_sparus2` | Vehicle **SparusII** |
-| `girona500_description`, `cola2_girona500` | Vehicle **Girona500** |
-| `stonefish_ros`, `cola2_stonefish` | Pont ROS ↔ Stonefish i els escenaris |
+| `cola2_lib` | Biblioteca C++ pura (es compila fora del workspace catkin): utilitats matemàtiques, rotacions, E/S i tipus base sobre els quals descansa tota la resta de COLA2. |
+| `Stonefish` | El **simulador submarí**, com a biblioteca C++: dinàmica de sòlid rígid amb Bullet Physics, hidrodinàmica (massa afegida, arrossegament, flotabilitat), models de sensors (DVL, IMU, pressió, multibeam, càmeres) i render OpenGL de l'escena. |
+| `cola2_msgs` | Tots els tipus de missatge i servei de COLA2: estat de navegació, velocitats en marc cos/món, *setpoints* de control, esdeveniments de seguretat, missió... |
+| `cola2_lib_ros` | La cola entre `cola2_lib` i ROS: lectura de paràmetres, diagnòstics, transformacions (TF) i publicadors amb el format que espera la resta de la pila. |
+| `cola2_core` | El cor de l'arquitectura. Conté `cola2_nav` (**navegació**: fusió EKF de IMU + DVL + pressió → pose i velocitat contínues; és el que reconstrueixes de forma simplificada a PL2), `cola2_control` (controladors de posició i velocitat, repartiment als *thrusters*, teleoperació), `cola2_safety` (vigilàncies, regles d'abort i recuperació, emergir davant fallada), més el registre, les comunicacions i el *captain* de missions per waypoints. |
+| `sparus2_description` | URDF, malles i configuració del **SparusII**: AUV torpediforme d'uns 1,6 m d'IQUA Robotics. |
+| `cola2_sparus2` | La configuració i els launch propis del SparusII (quins sensors, quins guanys, com es connecta la seva pila COLA2). És el que arrenca l'àlies `sparus2`. |
+| `girona500_description` | URDF i malles del **Girona 500**: AUV reconfigurable de la Universitat de Girona (CIRS). |
+| `cola2_girona500` | Configuració i launch propis del Girona 500 (àlies `girona500`, `girona500_valve`, `girona500_wind`). |
+| `stonefish_ros` | El **pont ROS ↔ Stonefish**: node que executa el simulador, carrega els fitxers d'escena `.scn`, publica els topics de sensor simulats i la TF, i se subscriu als *setpoints* de propulsió. |
+| `cola2_stonefish` | Els **escenaris** de simulació ja fets (`.scn`) i els launch que connecten un vehicle COLA2 amb `stonefish_ros`. |
+
+> **Dues coses parcheades respecte a l'upstream**, perquè el curs funcioni sense GPU i amb la
+> versió de COLA2 fixada: la qualitat gràfica de Stonefish va en `low` (amb `high` els shaders
+> no compilen sota `llvmpipe` i no es dibuixa res) i el node de teleoperació es torna a lligar
+> al binari C++ que `cola2_core` fa servir ara (els launch encara demanaven la versió `.py`).
+>
+> **Limitació coneguda:** l'escenari `girona500_eca5emicro.scn` (braç manipulador) no funciona
+> perquè depèn d'un repo que no és públic. La resta d'escenaris sí.
 
 Tots els repositoris de codi font (COLA2/Stonefish i Kobuki) van fixats a **commit**, no a
 tag, perquè dues construccions separades en el temps donin exactament la mateixa imatge.
@@ -248,8 +292,9 @@ Obre Gazebo amb el Kobuki en un món buit. Les dues vies (robot físic o simulat
 
 El teu paquet (`pl1_cognom`) va dins de `code/PL1/`. `kobuki_node` no exposa cap executable
 propi: es carrega com a *nodelet* (vegeu `roslaunch kobuki_node minimal.launch` per al robot
-físic). Segueix l'enunciat de la pràctica per al detall del model cinemàtic i de
-l'experiment de caracterització de deriva.
+físic). Què fa cada paquet del stack Kobuki: secció [PL1 — Odometria en robots amb
+rodes](#pl1--odometria-en-robots-amb-rodes-kobuki) de «Què porta dins». Segueix l'enunciat de
+la pràctica per al detall del model cinemàtic i de l'experiment de caracterització de deriva.
 
 ## PL2 — Navegació per estima submarina (COLA2 + Stonefish)
 
@@ -264,9 +309,11 @@ Triga **~60 segons** a aixecar els 33 nodes. Paciència abans de donar res per t
 
 Quan estigui llest veuràs ~74 topics sota `/sparus2/...` (o `/girona500/...`): navegació,
 control, seguretat, thrusters i sensors. El teu paquet (`pl2_cognom`) va dins de `code/PL2/`.
-La pràctica treballa principalment sobre un rosbag de dades reals o simulades que et
-facilitarà el professorat; el simulador serveix per explorar la interfície de topics de COLA2
-abans de programar l'integrador de dead reckoning.
+Què fa cada paquet de COLA2 i Stonefish: secció [PL2 — Navegació per estima
+submarina](#pl2--navegació-per-estima-submarina-cola2--stonefish) de «Què porta dins». La
+pràctica treballa principalment sobre un rosbag de dades reals o simulades que et facilitarà
+el professorat; el simulador serveix per explorar la interfície de topics de COLA2 abans de
+programar l'integrador de dead reckoning.
 
 ### Sobre els gràfics: anirà lent, i és normal
 
