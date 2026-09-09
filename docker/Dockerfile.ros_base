@@ -1,0 +1,582 @@
+# syntax=docker/dockerfile:1
+#
+# ============================================================================
+#  IMAGEN DE CURSO — Ampliació de Robòtica (ROS Noetic)
+# ============================================================================
+#  Multiplataforma (Windows/macOS/Linux) vía escritorio noVNC en el navegador.
+#
+#  Tres stacks, uno por práctica de laboratorio:
+#
+#  PL0 — Introducció a ROS: turtlesim, ya incluido en la imagen base ROS
+#     Noetic. No necesita nada adicional.
+#
+#  PL1 — Odometria en robots amb rodes (Kobuki):
+#     - kobuki_core / kobuki / kobuki_msgs   (driver ROS del Kobuki)
+#     - kobuki_desktop                       (modelo simulado en Gazebo)
+#
+#  PL2 — Navegació per estima submarina (COLA2 + Stonefish, SparusII):
+#     - cola2_lib      (librería C++ base del SRV)
+#     - Stonefish      (simulador submarino: dinámica, sensores, render OpenGL)
+#     - COLA2 ROS      (cola2_msgs/lib_ros/core + SparusII + Girona500)
+#     - stonefish_ros + cola2_stonefish (puente ROS <-> Stonefish)
+#
+#  Se construye UNA vez y se publica en Docker Hub (amt132/ampliacio_robotica);
+#  los alumnos solo la descargan.
+#
+#  ⚠ Los pasos frágiles están AISLADOS en capas propias (4, 5, 6 y 7-bis)
+#     para que, si el build falla, sepas exactamente dónde. Ver README
+#     "Troubleshooting".
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# BASE — fijada en arquitectura Y en contenido. Las dos cosas son necesarias:
+#
+#  --platform=linux/amd64 : 'tiryoh/ros-desktop-vnc:noetic' es MULTI-ARCH
+#      (publica amd64 y arm64). Sin este flag, construir en un Mac con chip
+#      Apple (o en cualquier host arm64) baja la variante arm64 y el build
+#      revienta en la primera compilación C++ que suponga amd64. Con el flag,
+#      el build produce la MISMA imagen x86_64 se construya donde se
+#      construya, que es justo lo que queremos para el aula.
+#
+#  @sha256:...           : el tag ':noetic' es mutable. Fijar el digest hace
+#      que dos builds separados en el tiempo partan del mismo byte exacto.
+#      Para actualizar la base a conciencia:
+#        docker buildx imagetools inspect \
+#          docker.io/tiryoh/ros-desktop-vnc:noetic --format '{{.Manifest.Digest}}'
+#      y pega el digest aquí (o pásalo con --build-arg BASE_IMAGE=...).
+# ----------------------------------------------------------------------------
+ARG BASE_IMAGE=docker.io/tiryoh/ros-desktop-vnc:noetic@sha256:8b5f7c1132b7eb5945d7bfccde8078f5ca6002521014c641d0e943fae131edab
+FROM --platform=linux/amd64 ${BASE_IMAGE}
+
+LABEL org.opencontainers.image.title="AmpRobotica (ROS Noetic) - imagen de curso"
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    TZ=Etc/UTC \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+SHELL ["/bin/bash", "-c"]
+
+# ----------------------------------------------------------------------------
+# USUARIO DEL ESCRITORIO — leer esto antes de tocar nada.
+#
+# El '/entrypoint.sh' de la imagen base hace, resumido:
+#     USER=${USER:-root}
+#     HOME=/root
+#     if [ "$USER" != "root" ]; then
+#         useradd --create-home --groups adm,sudo "$USER"   # <- runtime
+#         HOME="/home/$USER"
+#     fi
+#     ... y arranca el VNC con: gosu "$USER" ...
+#
+# Consecuencias, las dos contraintuitivas:
+#   1. El usuario 'ubuntu' NO viene en la imagen. Lo crea el entrypoint AL
+#      ARRANCAR. En build time no existe, asi que cualquier 'chown ubuntu'
+#      en un RUN falla con "invalid user" si no lo creamos nosotros antes.
+#   2. Por defecto ($USER sin definir) el escritorio corre como ROOT con
+#      HOME=/root. Para que corra como 'ubuntu' hay que exportar USER en la
+#      imagen; no basta con crear el usuario.
+#
+# Elegimos usuario NO root (uid 1000) a proposito: en Linux el bind mount de
+# './code' conserva el uid del host, y con el escritorio como root los
+# ficheros que crea el alumno dentro del contenedor salen root:root en SU
+# disco y luego no puede editarlos con su editor de siempre. Con uid 1000
+# coinciden. En Windows/macOS da igual (Docker Desktop remapea), pero asi el
+# comportamiento es el mismo en los tres sistemas.
+#
+# Por eso hacen falta LAS TRES COSAS: crear el usuario aqui, cederle el
+# workspace con el chown de la capa 8, y exportar USER al final del fichero.
+# ----------------------------------------------------------------------------
+ARG COURSE_USER=ubuntu
+ARG COURSE_UID=1000
+ARG COURSE_GID=1000
+ENV COURSE_USER=${COURSE_USER}
+ENV CATKIN_WS=/home/${COURSE_USER}/catkin_ws
+
+# Carpeta del alumno DENTRO del contenedor: es el otro extremo del bind mount
+# de './code' que declara el docker-compose.yml, y la UNICA que sobrevive a
+# 'docker compose down'. Dentro lleva las tres subcarpetas PL0/PL1/PL2, una
+# por practica, para que sea evidente donde va el codigo de cada una.
+#
+# Se declara como variable porque la usan varios scripts que van dentro de la
+# imagen (el autotest y el preparador del escritorio): si la ruta se
+# escribiera a mano en cada uno, cambiarla obligaria a acordarse de todos los
+# sitios. Ver seccion "carpeta compartida" del README.
+ENV COURSE_CODE_DIR=${CATKIN_WS}/src/student
+
+RUN if ! getent group ${COURSE_GID} > /dev/null; then \
+      groupadd -g ${COURSE_GID} ${COURSE_USER}; \
+    fi && \
+    if ! id -u ${COURSE_USER} > /dev/null 2>&1; then \
+      useradd -m -s /bin/bash -u ${COURSE_UID} -g ${COURSE_GID} ${COURSE_USER}; \
+    fi && \
+    usermod -aG adm,sudo ${COURSE_USER} && \
+    echo "${COURSE_USER} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/90-${COURSE_USER} && \
+    chmod 0440 /etc/sudoers.d/90-${COURSE_USER} && \
+    id ${COURSE_USER}
+
+# ----------------------------------------------------------------------------
+# 1. Utilidades de desarrollo + herramientas ROS
+#    rosbridge-suite NO lo usa ninguna practica base; se deja instalado para
+#    quien quiera atacar el robot desde un cliente web/Python externo
+#    (roslibjs). Si no se va a usar, se puede quitar de esta lista y la
+#    imagen adelgaza.
+# ----------------------------------------------------------------------------
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      git vim nano wget ca-certificates build-essential cmake \
+      python3-pip python3-dev python3-tk \
+      python3-catkin-tools python3-osrf-pycommon \
+      ros-noetic-rosbridge-suite \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# ----------------------------------------------------------------------------
+# 2. Workspace catkin base
+#    Vacio de momento: las capas siguientes van clonando cada stack dentro.
+# ----------------------------------------------------------------------------
+RUN id -u ${COURSE_USER} > /dev/null && mkdir -p ${CATKIN_WS}/src
+
+# ============================================================================
+#  BLOQUE COLA2 + STONEFISH  (capas 3 a 6-bis) — PL2, vehiculo submarino
+#
+#  COLA2 (arquitectura de control para AUVs, del SRV) sobre Stonefish
+#  (simulador submarino con dinamica y sensores).
+#
+#  DIFERENCIA IMPORTANTE con el entrypoint de ejemplo del que parte esto: alli
+#  los repos se clonaban y compilaban EN CADA ARRANQUE dentro de un bind mount.
+#  Aqui NO. Este repo publica una imagen de aula: se construye una vez y el
+#  alumno solo la descarga. Clonar 11 repos y compilar COLA2 en cada 'docker
+#  compose up' serian ~15 min y conexion a internet por alumno y por sesion.
+#  Todo se hornea en la imagen; el entrypoint no clona nada.
+#
+#  Los refs van fijados a COMMIT, no a tag: un tag se puede mover y volveriamos
+#  a tener builds no reproducibles.
+#  Para actualizar uno:
+#    git ls-remote https://github.com/srv/<repo>.git refs/tags/<tag>^{}
+# ============================================================================
+
+# --- Refs fijados (tag de origen entre parentesis) ---------------------------
+ARG COLA2_LIB_COMMIT=95892afd3f63c1d45c520258f320883603170f15          # v1.3
+ARG STONEFISH_COMMIT=68598cc415a9bc5e9817d2d9c1953891e0631706          # v1.3
+ARG COLA2_MSGS_COMMIT=03f97a4764396122766ce2e69e305ed9896722ff         # v1.3
+ARG COLA2_LIB_ROS_COMMIT=5ea06fad648184b96acb1377eb68475296d227de      # noetic-24.01
+ARG COLA2_CORE_COMMIT=05d3a842a4b97db26841a5adf3b5665c0f6a01b0         # noetic-24.01
+ARG SPARUS2_DESCRIPTION_COMMIT=56bb7c36a32c7de31ffb0eb5ce41a6cc4a3b92ed # noetic-24.01
+ARG COLA2_SPARUS2_COMMIT=9d2effdb851d9debb56302cad8cfe03701c01c0d      # noetic-24.01
+ARG GIRONA500_DESCRIPTION_COMMIT=6ec4cdc1bf30b692fb47785d105e7f50b741a8ee # v1.3
+ARG COLA2_GIRONA500_COMMIT=fa3b48077d9bd516dd3e88582fd7ad3d36542648    # v1.3
+ARG STONEFISH_ROS_COMMIT=e0478728066808eb9db4ab6790206043b433acf9      # v1.3
+ARG COLA2_STONEFISH_COMMIT=d5c4f885ba0f36d8477a12d538f2b27ddbde2057    # v1.3
+
+# ----------------------------------------------------------------------------
+# 3. Dependencias de sistema de COLA2 y Stonefish
+#    - joy: COLA2 usa mando/joystick para teleoperar.
+#    - ruamel.yaml: COLA2 lee y REESCRIBE sus configuraciones conservando
+#      comentarios; con PyYAML normal se perderian.
+#    - libglm/libsdl2/libfreetype: el renderer OpenGL de Stonefish.
+#
+#    Aqui van SOLO las librerias de sistema que necesitan las compilaciones
+#    desde fuente de las capas 4 y 5. Las dependencias ROS del workspace van
+#    en la capa 5-bis, despues de Stonefish, para no invalidar su cache (que
+#    es la capa mas cara de la imagen) cada vez que se toque esa lista.
+# ----------------------------------------------------------------------------
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ros-noetic-joy lm-sensors lcov \
+      python3-ruamel.yaml python3-wstool \
+      libglm-dev libsdl2-dev libfreetype6-dev \
+      libgl1-mesa-dev libglu1-mesa-dev \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# ----------------------------------------------------------------------------
+# 4. cola2_lib  (libreria C++ pura, fuera del workspace catkin)  [FRÁGIL]
+#    Va ANTES de Stonefish a proposito: es dependencia de la parte ROS que
+#    viene despues, y compilarla aparte deja el fallo localizado si lo hay.
+# ----------------------------------------------------------------------------
+RUN git clone https://github.com/srv/cola2_lib.git /tmp/cola2_lib && \
+    cd /tmp/cola2_lib && git checkout -q ${COLA2_LIB_COMMIT} && \
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && \
+    cmake --build build -j"$(nproc)" && \
+    cmake --install build && ldconfig && \
+    rm -rf /tmp/cola2_lib
+
+# ----------------------------------------------------------------------------
+# 5. Stonefish  (simulador submarino, libreria C++)  [FRÁGIL]
+#    Es la capa mas larga de toda la imagen (renderer + fisica).
+# ----------------------------------------------------------------------------
+RUN git clone https://github.com/srv/stonefish.git /tmp/stonefish && \
+    cd /tmp/stonefish && git checkout -q ${STONEFISH_COMMIT} && \
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && \
+    cmake --build build -j"$(nproc)" && \
+    cmake --install build && ldconfig && \
+    rm -rf /tmp/stonefish
+
+# ----------------------------------------------------------------------------
+# 5-bis. Dependencias ROS del workspace COLA2
+#
+#    Estas TRES no estaban en el Dockerfile de referencia porque aquel partia
+#    de 'ros:noetic-desktop-FULL', que ya las trae. Nuestra base noVNC es
+#    'desktop' a secas: sin pcl_ros, stonefish_ros no configura y la capa 6
+#    muere con "Could not find a package configuration file provided by
+#    pcl_ros". La lista sale de cruzar las dependencias declaradas en los
+#    package.xml de los 9 repos con lo que ya resuelve la imagen base:
+#      find . -name package.xml -exec grep -hoE '<(depend|.*_depend)>[^<]+' {} \;
+# ----------------------------------------------------------------------------
+#    python-is-python3 crea el enlace /usr/bin/python. Los nodos Python de
+#    COLA2 llevan shebang '#!/usr/bin/env python' (estilo python2) y en Ubuntu
+#    20.04 solo existe 'python3'. Sin este paquete, roslaunch arranca pero
+#    ~20 nodos entran en bucle de respawn escupiendo
+#      /usr/bin/env: 'python': No such file or directory
+#    y la simulacion queda a medias (el nucleo C++ vivo, la capa Python no).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ros-noetic-pcl-ros ros-noetic-pcl-conversions \
+      ros-noetic-controller-manager \
+      python-is-python3 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# ----------------------------------------------------------------------------
+# 6. Paquetes ROS de COLA2 + Stonefish dentro del workspace  [FRÁGIL]
+#    Se compilan aqui, antes de Kobuki y del recompilado final, para que la
+#    capa quede cacheada: tocar otro stack no obliga a recompilar COLA2 entero.
+#
+#    NOTA — 'cola2_stonefish' declara <exec_depend>eca_5emicro_manipulator_
+#    description</exec_depend>, y ese repo NO es publico en github.com/srv.
+#    Al ser exec_depend (no build_depend) catkin_make NO falla; lo unico que
+#    queda inservible es el escenario 'girona500_eca5emicro.scn' (brazo
+#    manipulador). Los otros 7 escenarios funcionan.
+# ----------------------------------------------------------------------------
+RUN cd ${CATKIN_WS}/src && \
+    for spec in \
+        "cola2_msgs:${COLA2_MSGS_COMMIT}" \
+        "cola2_lib_ros:${COLA2_LIB_ROS_COMMIT}" \
+        "cola2_core:${COLA2_CORE_COMMIT}" \
+        "sparus2_description:${SPARUS2_DESCRIPTION_COMMIT}" \
+        "cola2_sparus2:${COLA2_SPARUS2_COMMIT}" \
+        "girona500_description:${GIRONA500_DESCRIPTION_COMMIT}" \
+        "cola2_girona500:${COLA2_GIRONA500_COMMIT}" \
+        "stonefish_ros:${STONEFISH_ROS_COMMIT}" \
+        "cola2_stonefish:${COLA2_STONEFISH_COMMIT}" ; do \
+      repo="${spec%%:*}"; sha="${spec##*:}"; \
+      echo "==> ${repo} @ ${sha}"; \
+      git clone -q "https://github.com/srv/${repo}.git" "${repo}" && \
+      git -C "${repo}" checkout -q "${sha}" || exit 1; \
+    done && \
+    source /opt/ros/noetic/setup.bash && \
+    cd ${CATKIN_WS} && catkin_make -DCMAKE_BUILD_TYPE=Release
+
+# ----------------------------------------------------------------------------
+# 6-bis-A. Desfase de versiones upstream: teleoperation_node .py -> C++
+#
+# cola2_core@noetic-24.01 migro 'teleoperation_node' de Python a C++ (solo
+# queda teleoperation_node.cpp; el binario sale en devel/lib/cola2_control/).
+# Los launch de cola2_stonefish NO se actualizaron y siguen pidiendo
+# 'teleoperation_node.py', asi que roslaunch aborta ese nodo con
+#   "Cannot locate node of type [teleoperation_node.py] in package
+#    [cola2_control]"
+# y detras se cae 'keyboard_to_teleoperation', que espera su servicio
+# /<robot>/teleoperation/enable_thrusters -> sin teleoperacion por teclado.
+#
+# COMPROBADO en las 4 ramas de cola2_stonefish (v1.3, noetic-24.01, master y
+# noetic-24.01-MRS): NINGUNA esta alineada con este core; la MRS solo corrige
+# 1 de sus 4 launch. No es cuestion de elegir otro tag, hay que parchearlo.
+# cola2_sparus2@noetic-24.01 ya usa la forma C++ en su sim_core.launch, que es
+# la referencia de como debe quedar.
+#
+# OJO: solo cambia el nodo 'teleoperation'. 'keyboard_to_teleoperation_node.py'
+# y 'logitech_fx10_to_teleoperation_node.py' SIGUEN siendo Python y existen;
+# el ancla type=" evita tocarlos.
+# ----------------------------------------------------------------------------
+RUN cd ${CATKIN_WS}/src/cola2_stonefish/launch && \
+    grep -q 'type="teleoperation_node.py"' *.launch || \
+      { echo "ERROR: ya no hay teleoperation_node.py; revisa si sobra el parche"; exit 1; } && \
+    sed -i 's|type="teleoperation_node.py"|type="teleoperation_node"|g' *.launch && \
+    ! grep -q 'type="teleoperation_node.py"' *.launch && \
+    test -x ${CATKIN_WS}/devel/lib/cola2_control/teleoperation_node
+
+# ----------------------------------------------------------------------------
+# 6-bis-B. Calidad grafica de Stonefish: 'high' NO funciona en este escritorio
+#
+# MEDIDO, no supuesto. El escritorio noVNC no tiene GPU: Mesa entrega un
+# contexto OpenGL 4.5 por 'llvmpipe' (rasterizador por software). Con eso:
+#   - graphics_quality=high -> "[ERROR] Failed to compile shader" en cadena;
+#     la ventana abre pero no se dibuja nada (los shaders son los de la ruta
+#     avanzada, herencia de codigo NVIDIA).
+#   - graphics_quality=low  -> compila, "[INFO] Ready for running...", el
+#     simulador arranca con Bullet Physics y publica sus topics.
+#
+# Los 4 launch de cola2_stonefish traen 'high' FIJO (value=, no default=), y
+# un value= dentro de un <include> no se puede sobreescribir desde fuera. Se
+# convierten a un <arg> con default 'low': funciona tal cual en el aula, y
+# quien tenga GPU de verdad puede pedir la calidad alta sin editar nada:
+#   roslaunch cola2_stonefish sparus2_tank_simulation.launch graphics_quality:=high
+#
+# El 'grep -q' final es la guarda: si un dia el upstream cambia esas lineas,
+# el build FALLA aqui en vez de publicar una imagen que no renderiza.
+# ----------------------------------------------------------------------------
+RUN cd ${CATKIN_WS}/src/cola2_stonefish/launch && \
+    for f in *.launch; do \
+      grep -q '<arg name="graphics_quality" value="high"/>' "$f" || \
+        { echo "ERROR: $f ya no trae graphics_quality=high; revisa el parche"; exit 1; }; \
+      sed -i \
+        -e 's|<arg name="graphics_quality" value="high"/>|<arg name="graphics_quality" value="$(arg graphics_quality)"/>|' \
+        -e '0,/<launch>/s|<launch>|<launch>\n    <!-- amprobotica: 'high' no compila bajo llvmpipe (sin GPU). Ver README. -->\n    <arg name="graphics_quality" default="low"/>|' \
+        "$f"; \
+    done && \
+    grep -l 'graphics_quality" default="low"' *.launch | wc -l | grep -qx 4
+
+# ============================================================================
+#  BLOQUE KOBUKI  (capas 7 y 7-bis) — PL1, robot terrestre
+#
+#  El Kobuki es una base de traccion diferencial de Yujin Robot. PL1 pide su
+#  driver (kobuki_node, que publica /odom y /joint_states) y su modelo
+#  simulado en Gazebo, porque el laboratorio puede no tener un Kobuki fisico:
+#  las dos vias exponen exactamente la misma interfaz ROS.
+#
+#  POR QUE SE COMPILA DESDE FUENTE Y NO SE INSTALA CON apt
+#  --------------------------------------------------------
+#  Noetic solo publica media pila. En packages.ros.org/ros/ubuntu focal hay
+#  kobuki-core, kobuki-driver, kobuki-msgs, kobuki-dock-drive y kobuki-ftdi,
+#  pero NO hay kobuki_node, kobuki_keyop, kobuki_description, kobuki_gazebo
+#  ni ninguno de los yocs_* de los que depende kobuki_node. Esa parte se
+#  quedo en Melodic. Comprobado sobre el indice de paquetes:
+#    curl -sL http://packages.ros.org/ros/ubuntu/dists/focal/main/binary-amd64/Packages.gz \
+#      | gunzip | grep '^Package: ros-noetic-kobuki'
+#
+#  De ahi que se clonen los repos de yujinrobot. Las ramas no coinciden entre
+#  repos y no es un descuido: kobuki_msgs y kobuki_core SI tienen rama noetic,
+#  el resto se queda en melodic (kobuki, kobuki_desktop) o en devel (yujin_ocs).
+#  Compilan igualmente contra Noetic y Gazebo 11.
+#
+#  yujin_ocs trae ~15 paquetes de los que kobuki solo necesita tres. Los demas
+#  arrastran dependencias que no estan en Noetic, asi que se descartan con
+#  CATKIN_IGNORE en vez de borrarlos: asi el repo queda intacto y se ve que
+#  la exclusion es deliberada.
+# ============================================================================
+ARG KOBUKI_COMMIT=4f7f1beea87a970519f8d842be0eb40f0d5cde68           # melodic
+ARG KOBUKI_MSGS_COMMIT=ec509794beaf2f7b5e8dea971054386bfee817f8      # noetic
+ARG KOBUKI_CORE_COMMIT=bee80ecd9718a55be8c1abe3b2170820099022a6      # noetic
+ARG YUJIN_OCS_COMMIT=17337e5a2d0a0f3711c55e272e656eb59174d657        # devel
+ARG KOBUKI_DESKTOP_COMMIT=f3384888d738ae734e3f2cbf281973c79b5b3e9d   # melodic
+
+# ----------------------------------------------------------------------------
+# 7. Dependencias de sistema del Kobuki
+#    ecl_* es la biblioteca de utilidades de Yujin sobre la que se apoya todo
+#    kobuki_core; libftdi/libusb son para el cable USB del robot fisico, y
+#    liborocos-kdl lo pide kobuki_node para la cinematica.
+# ----------------------------------------------------------------------------
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      liborocos-kdl-dev libusb-dev libftdi-dev \
+      ros-noetic-ecl-build ros-noetic-ecl-core ros-noetic-ecl-console \
+      ros-noetic-ecl-devices ros-noetic-ecl-exceptions ros-noetic-ecl-license \
+      ros-noetic-ecl-linear-algebra ros-noetic-ecl-mobile-robot \
+      ros-noetic-ecl-sigslots ros-noetic-ecl-streams ros-noetic-ecl-threads \
+      ros-noetic-ecl-time ros-noetic-ecl-command-line ros-noetic-ecl-converters \
+      ros-noetic-ecl-config ros-noetic-ecl-containers ros-noetic-ecl-errors \
+      ros-noetic-ecl-formatters ros-noetic-ecl-geometry ros-noetic-ecl-io \
+      ros-noetic-ecl-ipc ros-noetic-ecl-math ros-noetic-ecl-type-traits \
+      ros-noetic-ecl-utilities \
+      ros-noetic-diagnostic-updater ros-noetic-diagnostic-aggregator \
+      ros-noetic-nodelet ros-noetic-ros-controllers \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# ----------------------------------------------------------------------------
+# 7-bis. Pila ROS del Kobuki  [FRÁGIL]
+#
+#    Los CATKIN_IGNORE no son opcionales. Sin el de kobuki_qtestsuite el build
+#    muere con "Error 127" (le falta el generador de interfaces PyQt), y el
+#    mensaje no dice ni que paquete es ni que le falta. Los otros seis se
+#    excluyen porque son dashboards, tutoriales y el app manager: nada que use
+#    el curso, y arrastran dependencias sin release en Noetic.
+#
+#    La guarda final comprueba las TRES piezas que PL1 necesita de verdad:
+#    el nodelet del driver (kobuki_node no genera un ejecutable propio: se
+#    carga como nodelet, ver minimal.launch), el mundo de Gazebo con el
+#    modelo simulado, y el plugin que mueve ese modelo. Si upstream rompe
+#    cualquiera de ellas, el build falla aqui y no se publica una imagen en
+#    la que la practica no se puede hacer.
+# ----------------------------------------------------------------------------
+RUN cd ${CATKIN_WS}/src && \
+    git clone https://github.com/yujinrobot/kobuki.git && \
+    cd kobuki && git checkout -q ${KOBUKI_COMMIT} && cd .. && \
+    git clone https://github.com/yujinrobot/kobuki_msgs.git && \
+    cd kobuki_msgs && git checkout -q ${KOBUKI_MSGS_COMMIT} && cd .. && \
+    git clone https://github.com/yujinrobot/kobuki_core.git && \
+    cd kobuki_core && git checkout -q ${KOBUKI_CORE_COMMIT} && cd .. && \
+    git clone https://github.com/yujinrobot/yujin_ocs.git && \
+    cd yujin_ocs && git checkout -q ${YUJIN_OCS_COMMIT} && cd .. && \
+    git clone https://github.com/yujinrobot/kobuki_desktop.git && \
+    cd kobuki_desktop && git checkout -q ${KOBUKI_DESKTOP_COMMIT} && cd .. && \
+    for d in yujin_ocs/*/; do \
+      case "$d" in \
+        yujin_ocs/yocs_cmd_vel_mux/|yujin_ocs/yocs_controllers/|yujin_ocs/yocs_velocity_smoother/) ;; \
+        *) touch "$d/CATKIN_IGNORE" ;; \
+      esac; \
+    done && \
+    for p in kobuki_desktop/kobuki_qtestsuite kobuki_desktop/kobuki_dashboard \
+             kobuki/kobuki_rapps kobuki/kobuki_capabilities kobuki/kobuki_testsuite \
+             kobuki/kobuki_controller_tutorial kobuki/kobuki_auto_docking; do \
+      touch "$p/CATKIN_IGNORE"; \
+    done && \
+    source /opt/ros/noetic/setup.bash && \
+    cd ${CATKIN_WS} && catkin_make -DCMAKE_BUILD_TYPE=Release && \
+    test -f ${CATKIN_WS}/devel/lib/libkobuki_nodelet.so && \
+    test -f ${CATKIN_WS}/src/kobuki_desktop/kobuki_gazebo/launch/kobuki_playground.launch && \
+    test -f ${CATKIN_WS}/devel/lib/libgazebo_ros_kobuki.so
+
+# ----------------------------------------------------------------------------
+# 8. Carpeta del alumno + recompilado completo del workspace
+#
+#    A diferencia de versiones anteriores de esta imagen, ningun stack trae ya
+#    un paquete de curso horneado: los tres enunciados (PL0/PL1/PL2) piden que
+#    cada alumno cree su propio paquete catkin (pl0_cognom, pl1_cognom,
+#    pl2_cognom) dentro de esta carpeta. Aqui solo se crea el punto de montaje
+#    con sus tres subcarpetas y se cede al usuario del escritorio.
+#
+#    Sin el chown final, el alumno no puede compilar su propio nodo con 'cm':
+#    es el mismo motivo por el que se cede TODO /home/${COURSE_USER}, no solo
+#    esta carpeta (el resto del workspace tambien lo toco root al clonar los
+#    tres stacks anteriores).
+# ----------------------------------------------------------------------------
+RUN mkdir -p ${COURSE_CODE_DIR}/PL0 ${COURSE_CODE_DIR}/PL1 ${COURSE_CODE_DIR}/PL2 && \
+    source /opt/ros/noetic/setup.bash && \
+    cd ${CATKIN_WS} && catkin_make -DCMAKE_BUILD_TYPE=Release && \
+    chown -R ${COURSE_USER}:${COURSE_USER} /home/${COURSE_USER}
+
+# ----------------------------------------------------------------------------
+# 9. Dependencias Python
+# ----------------------------------------------------------------------------
+COPY docker/requirements_py38.txt /tmp/requirements_py38.txt
+RUN python3 -m pip install --no-cache-dir -r /tmp/requirements_py38.txt
+
+# ----------------------------------------------------------------------------
+# 10. Aliases + sourcing automático
+#
+# EL ORDEN IMPORTA, y es la trampa mas fina de toda la imagen.
+# Bash lee primero /etc/bash.bashrc y DESPUES ~/.bashrc. El entrypoint de la
+# base añade a ~/.bashrc, en runtime, esta linea:
+#     source /opt/ros/noetic/setup.bash
+# Sourcear el setup.bash BASE reescribe ROS_PACKAGE_PATH desde cero. Resultado
+# si el entorno del curso se monta solo en /etc/bash.bashrc: el overlay del
+# workspace se PIERDE, los alias siguen ahi (son del mismo fichero) pero
+# 'rospack find' de un paquete del curso contesta "package not found".
+# Sintoma clasico y desconcertante: los atajos existen pero nada funciona.
+#
+# Solucion en dos partes:
+#   a) todo el entorno vive en /etc/course_env.sh (una sola fuente de verdad);
+#   b) se sourcea al FINAL de cada ~/.bashrc, y ademas se pre-siembran en el
+#      .bashrc las dos lineas que el entrypoint busca con 'grep'. Al
+#      encontrarlas ya presentes NO añade nada, y nuestro bloque se queda el
+#      ultimo. Es la unica forma de ganar la carrera contra el entrypoint.
+#
+# El bloque en /etc/bash.bashrc se mantiene como red para cualquier usuario
+# cuyo ~/.bashrc no hayamos preparado.
+# ----------------------------------------------------------------------------
+COPY docker/course_aliases.sh /etc/course_aliases.sh
+RUN sed -i 's/\r$//' /etc/course_aliases.sh && \
+    chmod 0644 /etc/course_aliases.sh && \
+    { echo "# --- Entorno del curso (ROS Noetic) --- generado en el build"; \
+      echo "source /opt/ros/noetic/setup.bash"; \
+      echo "export CATKIN_WS=${CATKIN_WS}"; \
+      echo "export COURSE_CODE_DIR=${COURSE_CODE_DIR}"; \
+      echo "[ -f ${CATKIN_WS}/devel/setup.bash ] && source ${CATKIN_WS}/devel/setup.bash"; \
+      echo "[ -f /etc/course_aliases.sh ] && . /etc/course_aliases.sh"; \
+      echo "export ROS_MASTER_URI=http://localhost:11311"; \
+      echo "export ROS_HOSTNAME=localhost"; \
+    } > /etc/course_env.sh && \
+    chmod 0644 /etc/course_env.sh && \
+    echo "" >> /etc/bash.bashrc && \
+    echo "[ -f /etc/course_env.sh ] && . /etc/course_env.sh" >> /etc/bash.bashrc && \
+    for RC in /root/.bashrc /home/${COURSE_USER}/.bashrc; do \
+      touch "$RC"; \
+      grep -qF "source /opt/ros/noetic/setup.bash" "$RC" \
+        || echo "source /opt/ros/noetic/setup.bash" >> "$RC"; \
+      grep -qF "export ROS_AUTOMATIC_DISCOVERY_RANGE=" "$RC" \
+        || echo "# export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST" >> "$RC"; \
+      grep -qF "/etc/course_env.sh" "$RC" \
+        || echo "[ -f /etc/course_env.sh ] && . /etc/course_env.sh" >> "$RC"; \
+    done && \
+    chown ${COURSE_USER}:${COURSE_USER} /home/${COURSE_USER}/.bashrc
+
+WORKDIR ${CATKIN_WS}
+
+# ----------------------------------------------------------------------------
+# 11. Escritorio usable: VSCodium que abre y lanzadores de confianza
+#
+# DOS problemas distintos, con DOS sitios distintos donde arreglarlos:
+#
+# (A) Lo que vive en la IMAGEN se parchea aqui, en el build.
+#     /usr/share/applications/codium.desktop (menu de aplicaciones) invoca el
+#     binario Electron sin --no-sandbox. El sandbox de Chromium necesita crear
+#     user namespaces sin privilegios y el contenedor no puede:
+#        Failed to move to new namespace: ... errno = Operation not permitted
+#        FATAL ... zygote_host_impl_linux.cc ... Check failed
+#     VSCodium aborta antes de abrir ventana. Desde un icono, sin terminal a la
+#     vista, el alumno solo percibe que "no pasa nada".
+#     COMPROBADO: con --no-sandbox arranca y crea sus ventanas X.
+#
+# (B) Lo que el entrypoint RECREA EN CADA ARRANQUE (~/Desktop) no se puede
+#     arreglar en el build: se machacaria. Va en course_desktop_setup.sh,
+#     lanzado por supervisord. Ver ese fichero para el detalle del bug del
+#     'chmod +x "$HOME/Desktop/*.desktop"' con el glob entre comillas.
+#
+# El .conf va a conf.d/ con prefijo 'zz-' y nombre propio: el entrypoint
+# reescribe conf.d/supervisord.conf en cada arranque, pero solo ESE fichero, y
+# /etc/supervisor/supervisord.conf incluye conf.d/*.conf entero.
+# ----------------------------------------------------------------------------
+RUN for f in /usr/share/applications/codium.desktop \
+             /usr/share/applications/codium-url-handler.desktop; do \
+      [ -f "$f" ] || continue; \
+      grep -q -- '--no-sandbox' "$f" || \
+        sed -i 's|^Exec=/usr/share/codium/codium|Exec=/usr/share/codium/codium --no-sandbox|' "$f"; \
+    done && \
+    grep -q -- '--no-sandbox' /usr/share/applications/codium.desktop
+
+# Marca de version de la imagen. La imprime el autotest en su cabecera: cuando
+# un alumno escribe "no me funciona" y pega la salida, el profesor sabe SIN
+# preguntar si esta corriendo la imagen publicada o una copia vieja en cache
+# (el sintoma es identico, y es la primera pregunta que habria que hacer).
+# Se pasa desde fuera:  --build-arg IMAGE_VERSION="2026 rev1 $(git rev-parse --short HEAD)"
+ARG IMAGE_VERSION=dev
+RUN printf '%s (build %s)\n' "${IMAGE_VERSION}" "$(date -u '+%Y-%m-%d %H:%M UTC')" \
+      > /etc/course_image_version && chmod 0644 /etc/course_image_version
+
+# Autotest del entorno. Va a /usr/local/bin para que el alumno pueda lanzarlo
+# igual desde dentro del escritorio ('selftest') que desde su ordenador con
+# 'docker compose exec ros-dev selftest', sea Windows, macOS o Linux.
+COPY docker/course_selftest.sh /usr/local/bin/selftest
+RUN sed -i 's/\r$//' /usr/local/bin/selftest && \
+    chmod 0755 /usr/local/bin/selftest && \
+    bash -n /usr/local/bin/selftest
+
+COPY docker/course_desktop_setup.sh /usr/local/bin/course_desktop_setup.sh
+RUN sed -i 's/\r$//' /usr/local/bin/course_desktop_setup.sh && \
+    chmod 0755 /usr/local/bin/course_desktop_setup.sh && \
+    mkdir -p /etc/supervisor/conf.d && \
+    { echo "[program:course-desktop-setup]"; \
+      echo "command=/usr/local/bin/course_desktop_setup.sh"; \
+      echo "autostart=true"; \
+      echo "autorestart=false"; \
+      echo "startsecs=0"; \
+      echo "exitcodes=0"; \
+      echo "priority=999"; \
+      echo "user=root"; \
+      echo "environment=COURSE_USER=\"${COURSE_USER}\",CATKIN_WS=\"${CATKIN_WS}\",COURSE_CODE_DIR=\"${COURSE_CODE_DIR}\""; \
+      echo "stdout_logfile=/var/log/course_desktop_setup.log"; \
+      echo "redirect_stderr=true"; \
+    } > /etc/supervisor/conf.d/zz-course-desktop.conf
+
+# ----------------------------------------------------------------------------
+# 12. Interruptor que hace que el escritorio arranque como ${COURSE_USER}
+#
+# Se pone AL FINAL a proposito: el '/entrypoint.sh' de la base lee esta
+# variable, pero durante el build seguimos siendo root y algunas herramientas
+# (catkin, pip) miran $USER. Definiendola aqui, las capas anteriores se
+# construyen con $USER sin tocar y solo el arranque ve el valor nuevo.
+#
+# En el arranque, el entrypoint intentara 'useradd ubuntu' y fallara con
+# "user already exists" porque ya lo creamos nosotros. Es INOFENSIVO: el
+# script no lleva 'set -e' y las lineas siguientes (HOME, chown, .vnc,
+# xstartup, supervisord) se ejecutan igual.
+# ----------------------------------------------------------------------------
+ENV USER=${COURSE_USER}
+
+# NO se define ENTRYPOINT/CMD: los hereda la base noVNC (arranca el escritorio).
+# Tampoco se define USER (la directiva Docker): el entrypoint necesita empezar
+# como root para montar la sesion y luego baja a ${COURSE_USER} con 'gosu'.

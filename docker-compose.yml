@@ -1,0 +1,45 @@
+# Entorno de prácticas — Ampliació de Robòtica
+# Los alumnos NO necesitan tocar este fichero.
+#
+# (PROFESOR) La imagen se publica en Docker Hub; el repositorio debe ser PUBLICO
+# para que los alumnos puedan bajarla sin hacer 'docker login'.
+#
+# OJO: el documento de instalación (INSTALLACIO.md) lleva una COPIA de este
+# fichero, porque el alumno que solo tiene ese documento tiene que poder
+# crearlo a mano. Si cambias aqui el tag de la imagen o el volumen, cambialo
+# tambien alli.
+
+services:
+  ros-dev:
+    container_name: amprobotica-ros
+    image: amt132/ampliacio_robotica:2026   # <-- imagen publicada por el profesor
+
+    # La imagen es x86_64 y lo declaramos SIEMPRE, en los tres sistemas:
+    #   - Windows y Linux con Intel/AMD: no cambia nada (ya son amd64).
+    #   - Mac con chip Apple (M1/M2/M3/M4): sin esta línea, Docker avisa de
+    #     desajuste de plataforma o se niega a arrancar. Con ella, emula.
+    # Así el fichero es idéntico para todos los alumnos y nadie tiene que
+    # descomentar nada según su portátil.
+    platform: linux/amd64
+
+    ports:
+      # Escritorio en el navegador -> http://localhost:6080
+      # Se publica SOLO en 127.0.0.1: el escritorio no pide contraseña y es
+      # sesión de root, así que no debe quedar expuesto a la red del aula.
+      # (Si necesitas entrar desde otro equipo, usa un túnel SSH.)
+      - "127.0.0.1:6080:80"
+    shm_size: "512m"
+    security_opt:
+      - seccomp:unconfined
+    volumes:
+      # Tu código va en la carpeta 'code', con una subcarpeta por práctica
+      # (PL0, PL1, PL2). Dentro del escritorio, compílalo con 'cm'.
+      # OJO: la ruta es /home/ubuntu/..., NO /root/...: el escritorio corre
+      # como el usuario 'ubuntu' y en /root no tendria ni acceso ni permisos.
+      # La carpeta 'code' viene ya en el repositorio a proposito: si no
+      # existiera, en Linux la crearia el demonio de Docker como root y no
+      # podrias escribir en ella desde el escritorio. Ver README.
+      - ./code:/home/ubuntu/catkin_ws/src/student
+    tty: true
+    stdin_open: true
+    restart: unless-stopped

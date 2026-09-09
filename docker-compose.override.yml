@@ -1,0 +1,20 @@
+# Override LOCAL del profesor — NO se versiona (está en .gitignore).
+#
+# Docker Compose carga este fichero automáticamente encima del
+# docker-compose.yml, sin que haya que pasarle ningún flag. Sirve para probar
+# la imagen que acabas de construir en local, antes de publicarla.
+#
+# El docker-compose.yml apunta a 'amt132/ampliacio_robotica:2026' (Docker Hub).
+# Mientras este fichero exista, 'docker compose up' usa TU imagen local y NUNCA
+# la publicada: es justo lo que quieres mientras desarrollas, pero significa que
+# aqui no estas probando lo mismo que recibira el alumno.
+#
+# ANTES DE DAR EL CURSO POR LISTO, comprueba la ruta del alumno de verdad:
+#   mv docker-compose.override.yml /tmp/   # apartalo un momento
+#   docker compose down && docker compose up -d && docker compose exec ros-dev selftest
+# Eso baja la imagen publicada y verifica que el repositorio es publico.
+
+services:
+  ros-dev:
+    image: amprobotica:dev
+    pull_policy: never        # usa la imagen local, no intentes bajarla

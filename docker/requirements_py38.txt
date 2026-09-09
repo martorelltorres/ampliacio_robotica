@@ -1,0 +1,6 @@
+# Dependencias Python del entorno (Python 3.8 / Ubuntu 20.04).
+# Versiones FIJADAS: son las ultimas que soportan Python 3.8. Sin pin, un
+# rebuild dentro de unos meses puede traer una version incompatible y romper
+# la imagen del aula. Añade aqui lo que necesites, siempre con version.
+numpy==1.24.4
+matplotlib==3.7.5
