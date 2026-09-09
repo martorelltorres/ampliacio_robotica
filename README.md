@@ -1,186 +1,179 @@
-# Entorno de prácticas — Ampliació de Robòtica (UIB)
+# Entorn de pràctiques — Ampliació de Robòtica (UIB)
 
-Imagen Docker **completa y lista para el aula**: un escritorio Linux con ROS Noetic que se
-abre **en el navegador**, con los simuladores de las tres prácticas ya compilados. Funciona
-igual en Windows, macOS y Linux.
-
-El profesor la construye **una vez** y la publica; los alumnos solo la descargan.
-
-- **Instalación paso a paso:** [INSTALLACIO.md](INSTALLACIO.md) — guia completa en català,
-  amb els tres sistemes operatius.
-- **[Guía del alumno](#guía-del-alumno)** — arrancar, trabajar, cerrar.
-- **[Guía del profesor](#guía-del-profesor)** — construir, probar, publicar.
+Imatge Docker **completa i llesta per a l'aula**: un escriptori Linux amb ROS Noetic que
+s'obre **al navegador**, amb els simuladors de les tres pràctiques ja compilats. Funciona
+igual a Windows, macOS i Linux.
 
 ---
 
-## Qué lleva dentro
+## Què porta dins
 
-Base `tiryoh/ros-desktop-vnc:noetic` → escritorio MATE por navegador (noVNC), idéntico en
-los tres sistemas operativos. Tres stacks, uno por práctica de laboratorio:
+Base `tiryoh/ros-desktop-vnc:noetic` → escriptori MATE per navegador (noVNC), idèntic als
+tres sistemes operatius. Tres stacks, un per pràctica de laboratori:
 
 ### PL0 — Introducció a ROS
 
-Usa `turtlesim` y las herramientas estándar de ROS Noetic (`rqt_graph`, `rqt_plot`, `rosbag`,
-`rviz`...), ya incluidas en la imagen base. No necesita nada adicional.
+Fa servir `turtlesim` i les eines estàndard de ROS Noetic (`rqt_graph`, `rqt_plot`, `rosbag`,
+`rviz`...), ja incloses a la imatge base. No necessita res addicional.
 
 ### PL1 — Odometria en robots amb rodes (Kobuki)
 
-| Componente | Qué es |
+| Component | Què és |
 |---|---|
 | `kobuki`, `kobuki_core`, `kobuki_msgs` | Driver ROS del Kobuki (`kobuki_node`, `kobuki_keyop`) |
-| `kobuki_desktop` | Modelo simulado en Gazebo, misma interfaz ROS que el robot físico |
-| `yocs_cmd_vel_mux`, `yocs_velocity_smoother` | Multiplexado y suavizado de velocidad que usa el driver |
+| `kobuki_desktop` | Model simulat a Gazebo, mateixa interfície ROS que el robot físic |
+| `yocs_cmd_vel_mux`, `yocs_velocity_smoother` | Multiplexatge i suavitzat de velocitat que fa servir el driver |
 
 ### PL2 — Navegació per estima submarina (COLA2 + Stonefish)
 
-| Componente | Qué es |
+| Component | Què és |
 |---|---|
-| `cola2_lib` | Biblioteca C++ base del SRV (compilada desde fuente) |
-| `Stonefish` | Simulador submarino: dinámica con Bullet Physics, sensores y render OpenGL |
-| `cola2_msgs`, `cola2_lib_ros` | Mensajes y utilidades ROS de COLA2 |
-| `cola2_core` | Control, navegación, seguridad, log, comms y simulación |
-| `sparus2_description`, `cola2_sparus2` | Vehículo **SparusII** |
-| `girona500_description`, `cola2_girona500` | Vehículo **Girona500** |
-| `stonefish_ros`, `cola2_stonefish` | Puente ROS ↔ Stonefish y los escenarios |
+| `cola2_lib` | Biblioteca C++ base del SRV (compilada des del codi font) |
+| `Stonefish` | Simulador submarí: dinàmica amb Bullet Physics, sensors i render OpenGL |
+| `cola2_msgs`, `cola2_lib_ros` | Missatges i utilitats ROS de COLA2 |
+| `cola2_core` | Control, navegació, seguretat, log, comms i simulació |
+| `sparus2_description`, `cola2_sparus2` | Vehicle **SparusII** |
+| `girona500_description`, `cola2_girona500` | Vehicle **Girona500** |
+| `stonefish_ros`, `cola2_stonefish` | Pont ROS ↔ Stonefish i els escenaris |
 
-Todos los repositorios de fuente (COLA2/Stonefish y Kobuki) van fijados a **commit**, no a
-tag, para que dos construcciones separadas en el tiempo den exactamente la misma imagen.
+Tots els repositoris de codi font (COLA2/Stonefish i Kobuki) van fixats a **commit**, no a
+tag, perquè dues construccions separades en el temps donin exactament la mateixa imatge.
 
-## Estructura del repositorio
+## Estructura del repositori
 
 ```
 ampliacio_robotica/
-├── docker-compose.yml           # lo que usan los ALUMNOS para arrancar
-├── code/                        # ← TU CÓDIGO VA AQUÍ (se guarda en tu ordenador)
-│   ├── PL0/                     #   práctica PL0 — Introducció a ROS
-│   ├── PL1/                     #   práctica PL1 — Odometria (Kobuki)
-│   └── PL2/                     #   práctica PL2 — Navegació per estima (COLA2)
+├── docker-compose.yml           # el que fan servir els ALUMNES per arrencar
+├── code/                        # ← EL TEU CODI VA AQUÍ (es desa al teu ordinador)
+│   ├── PL0/                     #   pràctica PL0 — Introducció a ROS
+│   ├── PL1/                     #   pràctica PL1 — Odometria (Kobuki)
+│   └── PL2/                     #   pràctica PL2 — Navegació per estima (COLA2)
 │
 ├── INSTALLACIO.md                # guia d'instal·lació pas a pas (català)
-└── docker/                       # todo lo que construye la imagen        (PROFESOR)
-    ├── Dockerfile.ros_base       # receta de la imagen, capas numeradas
-    ├── requirements_py38.txt     # deps Python, versiones fijadas
-    ├── course_aliases.sh         # atajos → /etc/course_aliases.sh
-    ├── course_selftest.sh        # autotest → 'selftest' dentro de la imagen
-    └── course_desktop_setup.sh   # arreglos del escritorio, en CADA arranque
+└── docker/                       # tot el que construeix la imatge
+    ├── Dockerfile.ros_base       # recepta de la imatge, capes numerades
+    ├── requirements_py38.txt     # dependències Python, versions fixades
+    ├── course_aliases.sh         # dreceres → /etc/course_aliases.sh
+    ├── course_selftest.sh        # autotest → 'selftest' dins la imatge
+    └── course_desktop_setup.sh   # arranjaments de l'escriptori, a CADA arrencada
 ```
 
-`code/` es la única carpeta que persiste fuera de la imagen: cada subcarpeta `PL0/`, `PL1/`
-y `PL2/` es donde el alumno crea su propio paquete catkin para esa práctica
-(`pl0_cognom`, `pl1_cognom`, `pl2_cognom`). Ningún stack trae ya un paquete de curso
-horneado: los tres enunciados piden explícitamente que el alumno cree el suyo con
+`code/` és l'única carpeta que persisteix fora de la imatge: cada subcarpeta `PL0/`, `PL1/`
+i `PL2/` és on l'alumne crea el seu propi paquet catkin per a aquella pràctica
+(`pl0_cognom`, `pl1_cognom`, `pl2_cognom`). Cap stack no porta ja un paquet de curs
+precuinat: els tres enunciats demanen explícitament que l'alumne creï el seu amb
 `catkin_create_pkg`.
 
 ---
 
-# Guía del alumno
+# Guia de l'alumne
 
-## Lo que necesitas
+## El que necessites
 
-- **Docker Desktop** (Windows y macOS) o **Docker Engine** (Linux) — <https://docs.docker.com/get-started/get-docker/>
-- Un navegador. Nada más: ROS, los simuladores y el escritorio van dentro de la imagen.
-- Unos **12 GB de disco libre**.
+- **Docker Desktop** (Windows i macOS) o **Docker Engine** (Linux) — <https://docs.docker.com/get-started/get-docker/>
+- Un navegador. Res més: ROS, els simuladors i l'escriptori van dins la imatge.
+- Uns **12 GB de disc lliure**.
 
-> **Descárgala en casa y con tiempo.** Treinta descargas simultáneas el primer día de clase
-> no acaban bien.
+> **Descarrega-la a casa i amb temps.** Trenta descàrregues simultànies el primer dia de
+> classe no acaben bé.
 
-Para la instalación completa paso a paso en los tres sistemas, con capturas de los comandos
-exactos, ver **[INSTALLACIO.md](INSTALLACIO.md)**. El resumen:
+Per a la instal·lació completa pas a pas als tres sistemes, amb els comandes exactes, vegeu
+**[INSTALLACIO.md](INSTALLACIO.md)**. El resum:
 
-**Windows:** Docker Desktop con backend **WSL2**. Pon la carpeta de trabajo en una ruta
-normal (`C:\Users\tu_usuario\...`), **no** en una unidad de red ni en OneDrive: la carpeta
-compartida falla ahí.
+**Windows:** Docker Desktop amb backend **WSL2**. Posa la carpeta de treball en una ruta
+normal (`C:\Users\el_teu_usuari\...`), **no** en una unitat de xarxa ni a OneDrive: la
+carpeta compartida hi falla.
 
-**macOS con chip Apple (M1/M2/M3/M4):** en Docker Desktop → *Settings* → *General*, activa
-**"Use Rosetta for x86/amd64 emulation"**. Sin eso va mucho más lento. No tienes que editar
-ni descomentar nada.
+**macOS amb xip Apple (M1/M2/M3/M4):** a Docker Desktop → *Settings* → *General*, activa
+**"Use Rosetta for x86/amd64 emulation"**. Sense això va molt més lent. No has d'editar ni
+descomentar res.
 
-## Arrancar y cerrar el contenedor
+## Arrencar i tancar el contenidor
 
-Todos los comandos se ejecutan **desde la carpeta `ampliacio_robotica/`**, en la terminal
-de tu sistema (PowerShell, Terminal o la que uses).
-
-```bash
-docker compose up -d          # arrancar (en segundo plano)
-```
-
-Luego abre **<http://localhost:6080>** en el navegador: ahí está el escritorio.
+Tots els comandes s'executen **des de la carpeta `ampliacio_robotica/`**, a la terminal del
+teu sistema (PowerShell, Terminal o la que facis servir).
 
 ```bash
-docker compose down           # cerrar y borrar el contenedor
-docker compose stop           # solo pararlo (conserva el estado interno)
-docker compose start          # volver a arrancarlo tras un 'stop'
-docker compose logs -f        # ver el arranque (Ctrl-C para salir)
-docker compose ps             # ¿está corriendo?
+docker compose up -d          # arrencar (en segon pla)
 ```
 
-**`docker compose down` no borra tu código**: lo que hay en `code/` está en tu disco, no
-dentro del contenedor. Ver la sección siguiente.
+Després obre **<http://localhost:6080>** al navegador: allà hi ha l'escriptori.
 
-> ### ⚠ No uses `docker run`
->
-> Es el error más frecuente. `docker run` **no monta la carpeta compartida**, así que tu
-> código no se guarda y desaparece al borrar el contenedor. También se salta el
-> `shm_size`, y entonces el navegador del escritorio se cierra solo.
->
-> Usa siempre `docker compose up -d`. El fichero `docker-compose.yml` ya se encarga del
-> volumen, el puerto, la memoria compartida y la plataforma.
->
-> Si ves `port is already allocated`, es que ya tienes un contenedor levantado. Comprueba
-> quién ocupa el puerto con `docker ps` y usa el que ya está.
+```bash
+docker compose down           # tancar i esborrar el contenidor
+docker compose stop           # només aturar-lo (conserva l'estat intern)
+docker compose start          # tornar a arrencar-lo després d'un 'stop'
+docker compose logs -f        # veure l'arrencada (Ctrl-C per sortir)
+docker compose ps             # està funcionant?
+```
 
-## Cómo se intercambian los ficheros con tu ordenador
+**`docker compose down` no esborra el teu codi**: el que hi ha a `code/` és al teu disc, no
+dins del contenidor. Vegeu la secció següent.
 
-Esta es la parte importante y conviene entenderla bien.
+> ### ⚠ No facis servir `docker run`
+>
+> És l'error més freqüent. `docker run` **no munta la carpeta compartida**, així que el teu
+> codi no es desa i desapareix en esborrar el contenidor. També se salta el `shm_size`, i
+> aleshores el navegador de l'escriptori es tanca sol.
+>
+> Fes servir sempre `docker compose up -d`. El fitxer `docker-compose.yml` ja s'encarrega
+> del volum, el port, la memòria compartida i la plataforma.
+>
+> Si veus `port is already allocated`, és que ja tens un contenidor aixecat. Comprova qui
+> ocupa el port amb `docker ps` i fes servir el que ja hi ha.
+
+## Com s'intercanvien els fitxers amb el teu ordinador
+
+Aquesta és la part important i convé entendre-la bé.
 
 ```
-   TU ORDENADOR                                DENTRO DEL CONTENEDOR
-   ────────────                                ─────────────────────
+   EL TEU ORDINADOR                            DINS DEL CONTENIDOR
+   ────────────────                            ───────────────────
    ampliacio_robotica/code/       <══════>     /home/ubuntu/catkin_ws/src/student
-     ├── PL0/                   (sincronizado    ├── PL0/
-     ├── PL1/                    al instante,    ├── PL1/
-     └── PL2/                    en ambos        └── PL2/
-                                  sentidos)
+     ├── PL0/                   (sincronitzat    ├── PL0/
+     ├── PL1/                    a l'instant,    ├── PL1/
+     └── PL2/                    en tots dos     └── PL2/
+                                   sentits)
 ```
 
-- **Todo lo que escribas en `code/` se ve dentro del contenedor**, y al revés. No hay que
-  copiar nada: es la misma carpeta vista desde dos sitios.
-- **Es lo único que sobrevive.** El resto del sistema de ficheros del contenedor vive
-  dentro de la imagen y **se pierde** con `docker compose down`.
-- Puedes editar con tu editor de siempre (VS Code, etc.) desde tu ordenador, o con
-  VSCodium dentro del escritorio. Da igual: es el mismo fichero.
+- **Tot el que escriguis a `code/` es veu dins del contenidor**, i a l'inrevés. No cal
+  copiar res: és la mateixa carpeta vista des de dos llocs.
+- **És l'únic que sobreviu.** La resta del sistema de fitxers del contenidor viu dins la
+  imatge i **es perd** amb `docker compose down`.
+- Pots editar amb el teu editor de sempre (VS Code, etc.) des del teu ordinador, o amb
+  VSCodium dins de l'escriptori. Tant se val: és el mateix fitxer.
 
-Dentro del escritorio tienes el enlace **`MY_CODE`** que lleva directo a esa carpeta.
+Dins de l'escriptori tens l'enllaç **`MY_CODE`** que porta directament a aquesta carpeta.
 
-**Ojo con la ruta:** la carpeta aparece en `catkin_ws/src/`**`student`**`/`, no directamente
-en `catkin_ws/src/`. Es a propósito: `src/` contiene también los paquetes de Kobuki y COLA2,
-y montar tu carpeta encima los taparía todos.
+**Ull amb la ruta:** la carpeta apareix a `catkin_ws/src/`**`student`**`/`, no directament a
+`catkin_ws/src/`. És a propòsit: `src/` conté també els paquets de Kobuki i COLA2, i muntar
+la teva carpeta al damunt els taparia tots.
 
-Cada práctica tiene su subcarpeta (`code/PL0/`, `code/PL1/`, `code/PL2/`). Dentro de cada
-una creas tu paquete catkin con `catkin_create_pkg` (ver el enunciado de cada práctica) —
-catkin encuentra paquetes en cualquier nivel de `src/`, así que no hace falta que estén
-directamente bajo `src/`.
+Cada pràctica té la seva subcarpeta (`code/PL0/`, `code/PL1/`, `code/PL2/`). Dins de cadascuna
+crees el teu paquet catkin amb `catkin_create_pkg` (vegeu l'enunciat de cada pràctica) —
+catkin troba paquets a qualsevol nivell de `src/`, així que no cal que estiguin directament
+sota `src/`.
 
-> **Linux:** no borres la carpeta `code/`. Si no existe al arrancar, la crea Docker como
-> `root` y no podrás escribir en ella. Si te pasa: `sudo chown -R 1000:1000 code`
+> **Linux:** no esborris la carpeta `code/`. Si no existeix en arrencar, Docker la crea com a
+> `root` i no hi podràs escriure. Si et passa: `sudo chown -R 1000:1000 code`
 
-## Comprueba que todo funciona
+## Comprova que tot funciona
 
-Antes de dar por hecho que algo está roto, lanza el autotest. Es el **mismo comando en
-Windows, macOS y Linux**:
+Abans de donar per fet que alguna cosa està trencada, executa l'autotest. És el **mateix
+comande a Windows, macOS i Linux**:
 
 ```bash
 docker compose exec ros-dev selftest
 ```
 
-O, desde una terminal dentro del escritorio, simplemente:
+O, des d'una terminal dins de l'escriptori, simplement:
 
 ```bash
 selftest
 ```
 
-Revisa la plataforma, el rendimiento, el usuario, la carpeta compartida, los stacks de
-Kobuki y COLA2, el escritorio del navegador y los finales de línea. Termina con un resumen:
+Revisa la plataforma, el rendiment, l'usuari, la carpeta compartida, els stacks de Kobuki i
+COLA2, l'escriptori del navegador i els finals de línia. Acaba amb un resum:
 
 ```
 === RESUMEN ===
@@ -189,494 +182,127 @@ Kobuki y COLA2, el escritorio del navegador y los finales de línea. Termina con
   Entorno correcto. Puedes empezar a trabajar.
 ```
 
-Si hay fallos, los lista con la sección donde salió, la causa y qué hacer. Ejecútalo
-**siempre** antes de pedir ayuda, y pega su salida entera si tienes que preguntar: la
-cabecera incluye la versión de la imagen, que es lo primero que necesita saber el profesor.
+Si hi ha fallades, les llista amb la secció on van sortir, la causa i què fer. Executa'l
+**sempre** abans de demanar ajuda, i enganxa'n la sortida sencera si has de preguntar.
 
-### Prueba a fondo, con el robot en marcha
+### Prova a fons, amb el robot en marxa
 
-Lo anterior comprueba que todo *está*. Si quieres comprobar que todo *funciona*, hay una
-prueba que arranca de verdad el simulador del Kobuki (tarda un minuto):
+L'anterior comprova que tot *hi és*. Si vols comprovar que tot *funciona*, hi ha una prova
+que arrenca de debò el simulador del Kobuki (triga un minut):
 
 ```bash
 docker compose exec ros-dev selftest --completo
 ```
 
-Añade una sección 8 que levanta `roscore` y Gazebo con el modelo del Kobuki, y verifica que
-circulan `/odom`, `/joint_states` y `/mobile_base/commands/velocity`. Al terminar lo cierra
-todo.
+Afegeix una secció 8 que aixeca `roscore` i Gazebo amb el model del Kobuki, i verifica que
+hi circulen `/odom`, `/joint_states` i `/mobile_base/commands/velocity`. En acabar ho tanca
+tot.
 
-> Si ya tienes ROS en marcha, esta sección **se salta** en vez de matarte la simulación.
-> Ciérrala y repite si la quieres.
+> Si ja tens ROS en marxa, aquesta secció **se salta** en comptes de matar-te la simulació.
+> Tanca-la i repeteix si la vols.
 
-## Atajos de la terminal del escritorio
+## Dreceres de la terminal de l'escriptori
 
-| Alias | Qué hace |
+| Àlies | Què fa |
 |---|---|
-| `cw` | ir al workspace |
+| `cw` | anar al workspace |
 | `cm` | compilar el workspace (Release) |
-| `sw` | recargar `devel/setup.bash` |
-| `wsclean` | borrar `build/` y `devel/` |
-| `selftest` | autotest del entorno |
-| `cpl0` / `cpl1` / `cpl2` | ir a `code/PL0`, `code/PL1` o `code/PL2` |
-| `kobuki_sim` | **PL1**: modelo del Kobuki en Gazebo |
-| `kobuki_keyop` | **PL1**: teleoperación por teclado |
-| `sparus2` | **PL2**: SparusII en la piscina |
-| `girona500` | **PL2**: Girona500 en la piscina |
-| `girona500_valve` | **PL2**: Girona500, giro de válvula |
+| `sw` | recarregar `devel/setup.bash` |
+| `wsclean` | esborrar `build/` i `devel/` |
+| `selftest` | autotest de l'entorn |
+| `cpl0` / `cpl1` / `cpl2` | anar a `code/PL0`, `code/PL1` o `code/PL2` |
+| `kobuki_sim` | **PL1**: model del Kobuki a Gazebo |
+| `kobuki_keyop` | **PL1**: teleoperació per teclat |
+| `sparus2` | **PL2**: SparusII a la piscina |
+| `girona500` | **PL2**: Girona500 a la piscina |
+| `girona500_valve` | **PL2**: Girona500, gir de vàlvula |
 | `girona500_wind` | **PL2**: Girona500, aerogenerador |
 
-> El alias de limpieza se llama `wsclean` y **no** `rosclean`: `rosclean` ya es una
-> herramienta de ROS y taparla con un alias que hace `rm -rf` es una trampa.
+> L'àlies de neteja es diu `wsclean` i **no** `rosclean`: `rosclean` ja és una eina de ROS i
+> tapar-la amb un àlies que fa `rm -rf` és un parany.
 
 ## PL0 — Introducció a ROS
 
-No necesita ningún alias del curso: es `turtlesim` y las herramientas estándar de ROS. Tu
-paquete (`pl0_cognom`) va dentro de `code/PL0/`. Sigue el enunciado de la práctica.
+No necessita cap àlies del curs: és `turtlesim` i les eines estàndard de ROS. El teu paquet
+(`pl0_cognom`) va dins de `code/PL0/`. Segueix l'enunciat de la pràctica.
 
 ## PL1 — Odometria en robots amb rodes (Kobuki)
 
-Si no tienes un Kobuki físico conectado, levanta su modelo simulado:
+Si no tens un Kobuki físic connectat, aixeca'n el model simulat:
 
 ```bash
 kobuki_sim
 ```
 
-Abre Gazebo con el Kobuki en un mundo vacío. Las dos vías (robot físico o simulado) exponen
-la **misma interfaz ROS**:
+Obre Gazebo amb el Kobuki en un món buit. Les dues vies (robot físic o simulat) exposen la
+**mateixa interfície ROS**:
 
-| Topic / interfaz | Tipo | Sentido |
+| Topic / interfície | Tipus | Sentit |
 |---|---|---|
 | `/odom` | `nav_msgs/Odometry` | el driver **publica** |
-| `/mobile_base/commands/velocity` | `geometry_msgs/Twist` | el alumno **publica** |
+| `/mobile_base/commands/velocity` | `geometry_msgs/Twist` | l'alumne **publica** |
 | `/mobile_base/sensors/imu_data` | `sensor_msgs/Imu` | el driver **publica** |
 | `/joint_states` | `sensor_msgs/JointState` | el driver **publica** |
-| `/mobile_base/commands/reset_odometry` | `std_msgs/Empty` | el alumno **publica** |
+| `/mobile_base/commands/reset_odometry` | `std_msgs/Empty` | l'alumne **publica** |
 | `/mobile_base/events/bumper` | `kobuki_msgs/BumperEvent` | el driver **publica** |
 
-Tu paquete (`pl1_cognom`) va dentro de `code/PL1/`. `kobuki_node` no expone un ejecutable
-propio: se carga como *nodelet* (ver `roslaunch kobuki_node minimal.launch` para el robot
-físico). Sigue el enunciado de la práctica para el detalle del modelo cinemático y del
-experimento de caracterización de deriva.
+El teu paquet (`pl1_cognom`) va dins de `code/PL1/`. `kobuki_node` no exposa cap executable
+propi: es carrega com a *nodelet* (vegeu `roslaunch kobuki_node minimal.launch` per al robot
+físic). Segueix l'enunciat de la pràctica per al detall del model cinemàtic i de
+l'experiment de caracterització de deriva.
 
 ## PL2 — Navegació per estima submarina (COLA2 + Stonefish)
 
-Aquí **una sola terminal** basta: el launch levanta el simulador y toda la pila COLA2.
+Aquí **n'hi ha prou amb una sola terminal**: el launch aixeca el simulador i tota la pila
+COLA2.
 
 ```bash
 sparus2          # o girona500, girona500_valve, girona500_wind
 ```
 
-Tarda **~60 segundos** en levantar los 33 nodos. Paciencia antes de dar nada por roto.
+Triga **~60 segons** a aixecar els 33 nodes. Paciència abans de donar res per trencat.
 
-Cuando esté listo verás ~74 topics bajo `/sparus2/...` (o `/girona500/...`): navegación,
-control, seguridad, thrusters y sensores. Tu paquete (`pl2_cognom`) va dentro de
-`code/PL2/`. La práctica trabaja principalmente sobre un rosbag de datos reales o simulados
-que te facilitará el profesorado; el simulador sirve para explorar la interfaz de topics de
-COLA2 antes de programar el integrador de dead reckoning.
+Quan estigui llest veuràs ~74 topics sota `/sparus2/...` (o `/girona500/...`): navegació,
+control, seguretat, thrusters i sensors. El teu paquet (`pl2_cognom`) va dins de `code/PL2/`.
+La pràctica treballa principalment sobre un rosbag de dades reals o simulades que et
+facilitarà el professorat; el simulador serveix per explorar la interfície de topics de COLA2
+abans de programar l'integrador de dead reckoning.
 
-### Sobre los gráficos: irá lento, y es normal
+### Sobre els gràfics: anirà lent, i és normal
 
-El escritorio **no tiene GPU**. Mesa entrega OpenGL 4.5 por `llvmpipe`, que es un
-rasterizador **por software**. Stonefish arranca y simula bien, pero **el dibujado es
-lento**. La física va a velocidad nominal, así que para practicar control y navegación
-sirve perfectamente.
+L'escriptori **no té GPU**. Mesa lliura OpenGL 4.5 per `llvmpipe`, que és un ratserizador
+**per programari**. Stonefish arrenca i simula bé, però **el dibuixat és lent**. La física va
+a velocitat nominal, així que per practicar control i navegació serveix perfectament.
 
-Por eso la calidad gráfica va en `low` por defecto. Con `high` los shaders no llegan ni a
-compilar y no se dibuja nada. Si tienes una GPU de verdad y quieres probar:
+Per això la qualitat gràfica va en `low` per defecte. Amb `high` els shaders no arriben ni a
+compilar i no es dibuixa res. Si tens una GPU de debò i ho vols provar:
 
 ```bash
 roslaunch cola2_stonefish sparus2_tank_simulation.launch graphics_quality:=high
 ```
 
-## Si algo falla
+## Si alguna cosa falla
 
-Lanza primero `selftest`. Y si no, busca aquí el síntoma:
+Executa primer `selftest`. I si no, busca aquí el símptoma:
 
-| Síntoma | Causa y solución |
+| Símptoma | Causa i solució |
 |---|---|
-| `port is already allocated` | Ya tienes un contenedor arriba. `docker ps` para ver cuál; usa ése. |
-| No veo mis ficheros dentro del contenedor | Arrancaste con `docker run` en vez de `docker compose up -d`. Y recuerda: van a `src/student/`, no a `src/`. |
-| `pull access denied` o `repository does not exist` | Revisa que el `image:` diga exactamente `amt132/ampliacio_robotica:2026`. Si está bien escrito, avisa al profesor: la imagen es pública y no debería pedirte nada. |
-| `docker compose` dice *is not a docker command* | Tienes Compose v1 (`docker-compose`, con guion). Actualiza Docker Desktop. |
-| `no configuration file provided` | No estás en la carpeta donde está `docker-compose.yml`. `cd` hasta ella. |
-| La descarga se corta a medias | Vuelve a lanzar `docker compose up -d`: continúa por las capas que ya tiene, no empieza de cero. |
-| `no space left on device` | Menos de 12 GB libres. Libera disco y, si has probado otras imágenes, `docker system prune -a`. |
-| `rospack find ...` dice *package not found* pero los atajos existen | Problema de orden de sourcing. Comprueba `echo $ROS_PACKAGE_PATH`: debe empezar por `/home/ubuntu/catkin_ws/src`. |
-| "Untrusted application launcher" al pulsar un icono | No debería pasar ya. Si pasa: `docker exec amprobotica-ros cat /var/log/course_desktop_setup.log` |
-| VSCodium no abre al hacer doble clic | Necesita `--no-sandbox`, ya viene puesto. Si falla, mira el log de arriba. |
-| Stonefish abre ventana pero no dibuja | Calidad gráfica en `high`. Ver la sección de gráficos. |
-| El escritorio se cierra solo | Falta memoria compartida: arranca con `docker compose`, no con `docker run`. |
-| No puedo escribir en `code/` (Linux) | `sudo chown -R 1000:1000 code` |
-| `localhost:6080` no carga nada | Lanza `selftest`: su sección 6 dice si el escritorio está sirviendo **dentro** del contenedor. Si ahí sale todo OK, el problema es de tu navegador o del puerto (¿otro contenedor ocupando el 6080?); si sale FALLO, `docker compose restart`. |
-| `roscore` dice *Unable to contact my own server* | El nombre del contenedor no resuelve. Lo detecta el `selftest` (sección 2). |
-| `cm` falla con errores raros del compilador | Disco de Docker lleno. El `selftest` avisa; desde tu ordenador: `docker system prune -a`. |
-| Todo va lentísimo (Mac con chip Apple) | Es emulación. El `selftest` la detecta en la sección 1. Activa Rosetta en Docker Desktop > Settings > General. |
+| `port is already allocated` | Ja tens un contenidor amunt. `docker ps` per veure quin; fes servir aquest. |
+| No veig els meus fitxers dins del contenidor | Has arrencat amb `docker run` en comptes de `docker compose up -d`. I recorda: van a `src/student/`, no a `src/`. |
+| `pull access denied` o `repository does not exist` | Revisa que l'`image:` digui exactament `amt132/ampliacio_robotica:2026`. Si està ben escrit, avisa el professorat: la imatge és pública i no t'hauria de demanar res. |
+| `docker compose` diu *is not a docker command* | Tens Compose v1 (`docker-compose`, amb guionet). Actualitza Docker Desktop. |
+| `no configuration file provided` | No ets a la carpeta on hi ha el `docker-compose.yml`. Fes `cd` fins allà. |
+| La descàrrega es talla a mitges | Torna a executar `docker compose up -d`: continua per les capes que ja té, no comença de zero. |
+| `no space left on device` | Menys de 12 GB lliures. Allibera disc i, si has provat altres imatges, `docker system prune -a`. |
+| `rospack find ...` diu *package not found* però les dreceres existeixen | Problema d'ordre de sourcing. Comprova `echo $ROS_PACKAGE_PATH`: ha de començar per `/home/ubuntu/catkin_ws/src`. |
+| "Untrusted application launcher" en prémer una icona | Ja no hauria de passar. Si passa: `docker exec amprobotica-ros cat /var/log/course_desktop_setup.log` |
+| VSCodium no s'obre en fer doble clic | Necessita `--no-sandbox`, ja ve posat. Si falla, mira el log de dalt. |
+| Stonefish obre finestra però no dibuixa | Qualitat gràfica en `high`. Vegeu la secció de gràfics. |
+| L'escriptori es tanca sol | Falta memòria compartida: arrenca amb `docker compose`, no amb `docker run`. |
+| No puc escriure a `code/` (Linux) | `sudo chown -R 1000:1000 code` |
+| `localhost:6080` no carrega res | Executa `selftest`: la seva secció 6 diu si l'escriptori està servint **dins** del contenidor. Si allà surt tot OK, el problema és del teu navegador o del port (hi ha un altre contenidor ocupant el 6080?); si surt FALLO, `docker compose restart`. |
+| `roscore` diu *Unable to contact my own server* | El nom del contenidor no resol. Ho detecta el `selftest` (secció 2). |
+| `cm` falla amb errors estranys del compilador | Disc de Docker ple. El `selftest` avisa; des del teu ordinador: `docker system prune -a`. |
+| Tot va lentíssim (Mac amb xip Apple) | És emulació. El `selftest` la detecta a la secció 1. Activa Rosetta a Docker Desktop > Settings > General. |
 
 ---
-
-# Guía del profesor
-
-## Construir
-
-```bash
-cd ampliacio_robotica
-DOCKER_BUILDKIT=1 docker build --progress=plain -f docker/Dockerfile.ros_base -t amprobotica:dev .
-```
-
-El comando es el mismo en los tres sistemas y **no lleva `--platform`**: el `FROM` ya fija
-`linux/amd64` y el digest de la base. Ver *Compatibilidad*. Nota que el contexto de build
-sigue siendo la raíz del repositorio (`.`), no `docker/`: el Dockerfile hace
-`COPY docker/...` porque los ficheros que copia viven en esa subcarpeta.
-
-Los pasos marcados `[FRÁGIL]` (capas 4, 5, 6 y 7-bis) están aislados a propósito para que,
-si el build falla, el error salga localizado.
-
-## Probar antes de publicar
-
-```bash
-docker compose up -d
-docker compose exec ros-dev selftest              # comprobaciones estáticas, exit 0 si todo bien
-docker compose exec ros-dev selftest --completo   # + arranca el Kobuki simulado de verdad (~1 min)
-```
-
-El autotest está escrito para dar el mismo resultado lo lance root (`docker compose exec`)
-o el alumno desde el escritorio: todo lo que depende de permisos, de `$HOME` o del entorno
-interactivo lo ejecuta **como `ubuntu`**. Si añades comprobaciones de ese tipo, hazlo
-también — comprobarlas como root da falsos `[ OK ]`, porque root escribe donde quiere.
-
-Conviene construir con la versión marcada, para que la cabecera del autotest identifique la
-imagen cuando un alumno pegue su salida:
-
-```bash
-docker build -f docker/Dockerfile.ros_base \
-  --build-arg IMAGE_VERSION="2026 rev1 $(git rev-parse --short HEAD)" -t amprobotica:dev .
-```
-
-Para probar en local antes de publicar en Docker Hub, crea un `docker-compose.override.yml`
-(está en `.gitignore`, no llega a los alumnos):
-
-```yaml
-services:
-  ros-dev:
-    image: amprobotica:dev
-    pull_policy: never
-```
-
-Después, comprobación manual de los stacks:
-
-```bash
-# Kobuki (PL1), en el escritorio
-kobuki_sim
-rostopic list                                  # /odom /joint_states /mobile_base/...
-rostopic pub -r5 /mobile_base/commands/velocity geometry_msgs/Twist '{linear: {x: 0.15}}'
-rostopic hz /odom
-
-# Submarino (PL2)
-sparus2
-rostopic hz /sparus2/navigator/odometry       # ~10 Hz
-```
-
-> **Si pruebas por `docker exec` en vez de dentro del escritorio**, espera a que el
-> servidor X esté arriba o `rviz` y `stonefish_simulator` morirán con
-> `qt.qpa.xcb: could not connect to display :1`. No es un fallo de la imagen:
-> ```bash
-> until docker exec -u ubuntu -e DISPLAY=:1 <cont> xdpyinfo >/dev/null 2>&1; do sleep 2; done
-> ```
-
-## Publicar en Docker Hub
-
-El repositorio es **`amt132/ampliacio_robotica`**, y ya está puesto en la línea `image:`
-del `docker-compose.yml`, así que los alumnos no tienen que tocar nada.
-
-```bash
-docker login -u amt132                                     # pide un Access Token, no la contraseña
-docker tag amprobotica:dev amt132/ampliacio_robotica:2026
-docker push amt132/ampliacio_robotica:2026
-```
-
-Tres cosas que hay que hacer bien o los alumnos no podrán bajarla:
-
-1. **El repositorio debe ser público** (Docker Hub > el repo > *Settings* > *Make public*).
-   Si es privado, el alumno recibe `pull access denied` — el mismo mensaje que si el
-   nombre estuviera mal, así que es fácil perder una tarde con esto.
-2. **Autentícate con un Access Token**, no con la contraseña de la cuenta: Docker Hub >
-   *Account Settings* > *Personal access tokens*. Basta con permiso *Read & Write*.
-3. **Empuja también el tag `latest`** si quieres que `docker pull amt132/ampliacio_robotica`
-   a secas funcione. El compose pide `:2026` explícitamente, así que no es imprescindible.
-
-Comprueba que ha quedado pública **sin cerrar tu sesión** (un `docker logout` te obligaría
-a volver a hacer login). Basta con pedir un token anónimo, que es exactamente lo que hace
-el Docker de un alumno:
-
-```bash
-TOK=$(curl -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:amt132/ampliacio_robotica:pull" | grep -o '"token":"[^"]*' | cut -c10-)
-curl -sI -H "Authorization: Bearer $TOK" \
-     -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
-     https://registry-1.docker.io/v2/amt132/ampliacio_robotica/manifests/2026 | head -1
-```
-
-`HTTP/2 200` significa que cualquiera puede bajarla. Un `401` es que el repositorio sigue
-privado.
-
-Para comprobar que lo publicado es **exactamente** el build que has verificado, sin
-descargar los gigabytes otra vez, compara el *config digest* del manifest remoto con el ID
-de tu imagen local: si coinciden, son la misma imagen bit a bit.
-
-```bash
-curl -s -H "Authorization: Bearer $TOK" \
-     -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
-     https://registry-1.docker.io/v2/amt132/ampliacio_robotica/manifests/2026 \
-  | grep -A3 '"config"' | grep -o 'sha256:[a-f0-9]*'
-docker inspect --format '{{.Id}}' amprobotica:dev
-```
-
-## Republicar una versión corregida
-
-Esto hay que hacerlo bien, porque el fallo es silencioso: **Docker nunca vuelve a
-descargar un tag que ya tiene en caché**. Si corriges la imagen y la publicas con el mismo
-tag, el alumno que ya la bajó se queda con la vieja para siempre, y el síntoma en clase es
-el peor posible: *"a unos les funciona y a otros no"*, con el mismo `docker-compose.yml`.
-
-### Primero: ¿la tiene ya alguien?
-
-La pregunta real es **si ya has repartido el `docker-compose.yml`**:
-
-- **Todavía no lo ha visto ningún alumno** → puedes **sobrescribir el mismo tag** sin
-  consecuencias.
-- **Ya lo tienen** → **tag nuevo obligatorio** (`2026b`, `2026-rev2`…). No hay atajo, y no
-  sirve borrar y volver a subir: lo que manda es la caché del ordenador del alumno.
-
-El contador de Docker Hub ayuda, pero **no lo tomes como prueba**: cuenta también tus
-propias descargas y las de tus verificaciones.
-
-```bash
-curl -s https://hub.docker.com/v2/repositories/amt132/ampliacio_robotica/ | grep -o '"pull_count":[0-9]*'
-```
-
-### Procedimiento
-
-1. Haz el cambio. Si es estructural, **añade su comprobación al `selftest`** en el mismo
-   paso: es lo que evita publicar una imagen rota.
-2. Reconstruye **cambiando la versión**, que es lo que luego identifica la imagen:
-   ```bash
-   docker build -f docker/Dockerfile.ros_base --build-arg IMAGE_VERSION="2026 rev2" -t amprobotica:dev .
-   ```
-3. Verifica antes de subir nada:
-   ```bash
-   docker compose up -d --force-recreate
-   docker compose exec ros-dev selftest
-   docker compose exec ros-dev selftest --completo
-   ```
-4. Verifica **la ruta del alumno**, apartando el override (si no, estás probando tu imagen
-   local, no la publicada): ver el aviso dentro de `docker-compose.override.yml`.
-5. Sube:
-   ```bash
-   docker tag amprobotica:dev amt132/ampliacio_robotica:2026b
-   docker push amt132/ampliacio_robotica:2026b
-   ```
-6. **Cambia el tag en los dos sitios**: la línea `image:` del `docker-compose.yml` y la
-   copia del compose que lleva `INSTALLACIO.md`. Si solo cambias uno, la mitad de los
-   alumnos seguirá instalando la versión vieja.
-7. Comprueba el digest publicado con los comandos de la sección anterior.
-8. Avisa a los alumnos: **no se enteran solos**.
-
-### Qué tienen que hacer ellos
-
-```bash
-docker compose down
-# sustituir el docker-compose.yml (o editar a mano la línea 'image:')
-docker compose up -d
-```
-
-Tres cosas que conviene decirles al avisar:
-
-- **No pierden su código.** `code/` está en su disco, no en la imagen.
-- **La descarga suele ser pequeña**, no toda la imagen otra vez: solo bajan las capas que
-  han cambiado. De ahí una consecuencia práctica: **mete los cambios lo más al final
-  posible del Dockerfile**; una corrección en una capa temprana invalida todas las
-  siguientes y convierte una actualización de megabytes en uno de varios gigas.
-- **La imagen vieja se les queda ocupando disco.** Para recuperarlo:
-  `docker image rm amt132/ampliacio_robotica:<tag-viejo>`
-
-### Qué no hacer
-
-- **No borres el tag antiguo de Docker Hub** mientras alguien pueda estar usándolo. Si un
-  alumno hace `docker compose down` y ya no está el tag que pide su fichero, se queda sin
-  entorno a mitad de práctica. Cuesta cero dejarlo publicado.
-- **No republiques sin cambiar `IMAGE_VERSION`**: la cabecera del `selftest` es lo único
-  que te dice qué versión corre cada alumno cuando te pegue su salida, y mentiría.
-- **No te fíes de `latest`.** El compose pide un tag explícito a propósito; `latest` es
-  justo el tag que más se cachea y menos se controla.
-
-### Versiones publicadas
-
-| Tag | Fecha | Digest del manifest | Qué lleva |
-|---|---|---|---|
-| `2025` | 2026-07-31 | `ca5e430375…` | Primera versión del curso: stack Pioneer 3DX + COLA2. **Retirada**: ningún enunciado vigente (PL0/PL1/PL2) usa el stack Pioneer; ver `2026`. |
-| `2026` | *(pendiente de publicar)* | — | Reestructuración por prácticas (PL0/PL1/PL2): retira Pioneer/MobileSim/RosAria, añade el stack Kobuki para PL1, renombra `codigo/`→`code/` y `src/alumno`→`src/student`. |
-
-> **La imagen pesa varios GB** (la base noVNC ya son ~7.7 GB; los stacks de Kobuki y COLA2
-> añaden varios GB más). Avisa a los alumnos de que la descarguen en casa. Si el aula tiene
-> servidor local, una copia ahí ahorra el disgusto.
-
-## Compatibilidad: Windows, macOS y Linux
-
-Tres decisiones sostienen que la misma imagen y el mismo compose funcionen en los tres
-sistemas sin que el alumno edite nada:
-
-**1. La arquitectura está fijada en el `FROM`.** La base `tiryoh/ros-desktop-vnc` es
-**multi-arch** (amd64 *y* arm64). En un Mac con chip Apple, un build sin `--platform`
-bajaría la base arm64 y algunas de las compilaciones C++ desde fuente (Stonefish, cola2_lib,
-Kobuki) asumirían la arquitectura equivocada. Por eso el Dockerfile lleva
-`FROM --platform=linux/amd64`.
-
-**2. El digest de la base está fijado.** El tag `:noetic` es mutable; el digest no. Para
-actualizarlo a conciencia:
-```bash
-docker buildx imagetools inspect docker.io/tiryoh/ros-desktop-vnc:noetic \
-  --format '{{.Manifest.Digest}}'
-```
-
-**3. Los finales de línea están forzados a LF** por el `.gitattributes`. Git for Windows
-trae `core.autocrlf=true`: sin esto, un clon en Windows entrega los scripts del curso con
-shebang `#!/usr/bin/env bash\r` y el contenedor responde *"bad interpreter: No such file or
-directory"* — un error que no menciona ni Windows ni CRLF. El Dockerfile además pasa un
-`sed 's/\r$//'` sobre esos scripts como red de seguridad.
-
-**Construir desde un host arm64** necesita emulación QEMU (Docker Desktop la trae; en Linux
-arm64: `docker run --privileged --rm tonistiigi/binfmt --install amd64`). Aun así,
-**construye en un host amd64 si puedes**: emular las compilaciones C++ desde fuente es lento.
-
-## El usuario del escritorio: `ubuntu`, y no viene de serie
-
-Contraintuitivo, así que conviene leerlo antes de tocar el Dockerfile. El
-`/entrypoint.sh` de la base hace:
-
-```bash
-USER=${USER:-root}
-HOME=/root
-if [ "$USER" != "root" ]; then useradd --create-home ... "$USER"; HOME="/home/$USER"; fi
-```
-
-Es decir: **por defecto el escritorio corre como root**, y el usuario `ubuntu` **no existe
-en la imagen** — lo crea el entrypoint *al arrancar*, y solo si `USER` está definida.
-
-Que corra como `ubuntu` (uid 1000) es una decisión nuestra, y requiere **las tres cosas**:
-crear el usuario en build time (si no, el `chown` falla con *invalid user*), cederle el
-workspace con ese `chown`, y exportar `ENV USER=ubuntu` al final.
-
-El motivo es **Linux**: el bind mount de `code/` conserva el uid del host, así que con el
-escritorio como root los ficheros que crea el alumno le salen `root:root` en su propio
-disco. Con uid 1000 coinciden.
-
-**No añadas la directiva `USER` de Docker:** el entrypoint necesita empezar como root para
-montar la sesión y luego baja a `ubuntu` con `gosu`.
-
-## Parches al upstream, y por qué
-
-El build modifica ficheros de `cola2_stonefish`. Ambos parches llevan **guarda**: si el
-upstream cambia, el build falla en vez de publicar una imagen rota en silencio.
-
-**1. `graphics_quality: high` → `<arg default="low">`.** Sin GPU, `high` produce
-`[ERROR] Failed to compile shader` en cadena y no se dibuja nada; `low` llega a
-`Ready for running` con Bullet Physics. Los 4 launch traen `high` fijo (`value=`, que un
-`<include>` no deja sobreescribir desde fuera).
-
-**2. `teleoperation_node.py` → `teleoperation_node`.** `cola2_core@noetic-24.01` migró ese
-nodo de Python a C++, pero los launch de `cola2_stonefish` siguen pidiendo el `.py`. Sin el
-parche, roslaunch aborta ese nodo y detrás cae `keyboard_to_teleoperation`, que espera su
-servicio `enable_thrusters`: **te quedas sin teleoperación por teclado**. Comprobado en las
-4 ramas de `cola2_stonefish` (`v1.3`, `noetic-24.01`, `master`, `noetic-24.01-MRS`):
-ninguna está alineada con este core, así que no se arregla eligiendo otro tag.
-
-### Limitación conocida (COLA2)
-
-`cola2_stonefish` declara `<exec_depend>eca_5emicro_manipulator_description</exec_depend>`
-y **ese repo no es público** en `github.com/srv`. Al ser `exec_depend` y no `build_depend`,
-`catkin_make` no falla; lo único inservible es el escenario `girona500_eca5emicro.scn`
-(brazo manipulador).
-
-### Por qué Kobuki se compila desde fuente
-
-Noetic solo publica media pila de Kobuki: `packages.ros.org` trae `kobuki-core`,
-`kobuki-driver`, `kobuki-msgs`, `kobuki-dock-drive` y `kobuki-ftdi`, pero **no**
-`kobuki_node`, `kobuki_keyop`, `kobuki_description`, `kobuki_gazebo` ni los `yocs_*` de los
-que depende `kobuki_node` — esa parte se quedó en Melodic. Comprobado sobre el índice de
-paquetes:
-```bash
-curl -sL http://packages.ros.org/ros/ubuntu/dists/focal/main/binary-amd64/Packages.gz \
-  | gunzip | grep '^Package: ros-noetic-kobuki'
-```
-De ahí que se clonen los repos de `yujinrobot` (capa 7-bis del Dockerfile). Las ramas no
-coinciden entre repos y no es un descuido: `kobuki_msgs` y `kobuki_core` sí tienen rama
-`noetic`; el resto se queda en `melodic` (`kobuki`, `kobuki_desktop`) o en `devel`
-(`yujin_ocs`). Compilan igual contra Noetic y Gazebo 11.
-
-### Por qué todo se hornea en la imagen
-
-El `docker-entrypoint.sh` de referencia clonaba los 11 repos de COLA2 y ejecutaba
-`catkin build` **en cada arranque**, sobre un bind mount. Aquí no: esto publica una imagen
-de aula, y eso serían ~15 minutos y conexión a internet por alumno **y por sesión**.
-
-## El escritorio: dos arreglos a la imagen base
-
-**"Untrusted application launcher".** Caja marca un `.desktop` como de confianza si empieza
-por el shebang `#!/usr/bin/env xdg-open` (ya está) **y tiene bit de ejecución**. Lo segundo
-falla por un bug del entrypoint:
-
-```bash
-chmod +x "$HOME/Desktop/*.desktop"     # <-- glob ENTRE COMILLAS, nunca se aplica
-```
-
-**VSCodium no abre.** El sandbox de Chromium necesita user namespaces sin privilegios y el
-contenedor no puede: aborta con `FATAL ... zygote_host_impl_linux.cc` antes de crear
-ventana. Necesita `--no-sandbox`.
-
-| Qué | Dónde se arregla | Por qué ahí |
-|---|---|---|
-| `/usr/share/applications/codium.desktop` | Dockerfile, capa 11 | Vive en la imagen; el entrypoint no lo toca |
-| `~/Desktop/*.desktop` | [docker/course_desktop_setup.sh](docker/course_desktop_setup.sh) | El entrypoint **recrea `~/Desktop` en cada arranque** |
-
-El script lo lanza supervisord vía `/etc/supervisor/conf.d/zz-course-desktop.conf`. El
-nombre propio importa: el entrypoint reescribe `conf.d/supervisord.conf`, pero **solo ese
-fichero**, y el `supervisord.conf` principal incluye `conf.d/*.conf` entero.
-
-## Seguridad
-
-El escritorio noVNC **no pide contraseña**, y el usuario `ubuntu` tiene `sudo`: quien
-llegue al puerto tiene el contenedor entero. Por eso el `docker-compose.yml` publica el
-puerto como `127.0.0.1:6080:80` y no como `6080:80` (que en Docker significa `0.0.0.0` y
-dejaría el escritorio abierto a toda la red del aula). Para acceso remoto, un túnel SSH.
-
-## Troubleshooting del build
-
-**Capa 4 — `cola2_lib` no compila.** Compilación C++ desde fuente. Si falla el `cmake`,
-revisa las dependencias de sistema de la capa 3.
-
-**Capa 5 — Stonefish no compila.** Es la capa más larga de la imagen. Casi siempre falta
-una librería de la capa 3 (`libglm-dev`, `libsdl2-dev`, `libfreetype6-dev`,
-`libgl1-mesa-dev`).
-
-**Capa 6 — `Could not find ... pcl_ros`.** La base noVNC es `ros-desktop`, no
-`desktop-full`: hay dependencias ROS que hay que pedir explícitamente (capa 5-bis). Para
-regenerar la lista si añades repos:
-```bash
-find src -name package.xml -exec grep -hoE '<(depend|.*_depend)>[^<]+' {} \; \
-  | sed -E 's/.*>//' | sort -u
-```
-
-**Capa 7-bis — Kobuki falla con `Error 127`.** Falta ignorar `kobuki_qtestsuite` con
-`CATKIN_IGNORE`: le falta el generador de interfaces PyQt y el mensaje de error no lo dice.
-Revisa que la lista de `CATKIN_IGNORE` de esa capa siga completa.
-
-**Runtime — `/usr/bin/env: 'python': No such file or directory` (cientos de veces).**
-Falta `python-is-python3`. Los nodos Python de COLA2 llevan shebang `#!/usr/bin/env python`
-y Ubuntu 20.04 solo trae `python3`. Síntoma engañoso: roslaunch arranca, el núcleo C++
-funciona, pero ~20 nodos entran en bucle de respawn.
-
-**Runtime — los atajos existen pero `rospack` no encuentra nada.** Orden de sourcing. Bash
-lee `/etc/bash.bashrc` y *después* `~/.bashrc`, y el entrypoint añade a `~/.bashrc` un
-`source /opt/ros/noetic/setup.bash` que **reescribe `ROS_PACKAGE_PATH` desde cero**. La
-capa 10 lo resuelve pre-sembrando `~/.bashrc` para que el entorno del curso quede el
-último.
