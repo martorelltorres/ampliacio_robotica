@@ -1,0 +1,14 @@
+# Configuración local de herramientas de IA (Claude Code) — no se distribuye
+CLAUDE.md
+.claude/
+
+# Override local para probar la imagen antes de publicarla
+docker-compose.override.yml
+
+# Volumen del alumno: solo se versiona el .gitkeep de cada práctica
+code/PL0/*
+!code/PL0/.gitkeep
+code/PL1/*
+!code/PL1/.gitkeep
+code/PL2/*
+!code/PL2/.gitkeep
