@@ -290,6 +290,11 @@ Obre Gazebo amb el Kobuki en un món buit. Les dues vies (robot físic o simulat
 | `/mobile_base/commands/reset_odometry` | `std_msgs/Empty` | l'alumne **publica** |
 | `/mobile_base/events/bumper` | `kobuki_msgs/BumperEvent` | el driver **publica** |
 
+Per a l'anàlisi offline dels resultats, la imatge porta ja instal·lats `numpy`, `pandas` i
+`matplotlib` (versions fixades a [docker/requirements_py38.txt](docker/requirements_py38.txt)).
+No has d'instal·lar res amb `pip`: el que instal·lis dins del contenidor es perd en fer
+`docker compose down`.
+
 El teu paquet (`pl1_cognom`) va dins de `code/PL1/`. `kobuki_node` no exposa cap executable
 propi: es carrega com a *nodelet* (vegeu `roslaunch kobuki_node minimal.launch` per al robot
 físic). Què fa cada paquet del stack Kobuki: secció [PL1 — Odometria en robots amb
@@ -336,7 +341,7 @@ Executa primer `selftest`. I si no, busca aquí el símptoma:
 |---|---|
 | `port is already allocated` | Ja tens un contenidor amunt. `docker ps` per veure quin; fes servir aquest. |
 | No veig els meus fitxers dins del contenidor | Has arrencat amb `docker run` en comptes de `docker compose up -d`. I recorda: van a `src/student/`, no a `src/`. |
-| `pull access denied` o `repository does not exist` | Revisa que l'`image:` digui exactament `amt132/ampliacio_robotica:2026`. Si està ben escrit, avisa el professorat: la imatge és pública i no t'hauria de demanar res. |
+| `pull access denied` o `repository does not exist` | Revisa que l'`image:` digui exactament `amt132/ampliacio_robotica:2026b`. Si està ben escrit, avisa el professorat: la imatge és pública i no t'hauria de demanar res. |
 | `docker compose` diu *is not a docker command* | Tens Compose v1 (`docker-compose`, amb guionet). Actualitza Docker Desktop. |
 | `no configuration file provided` | No ets a la carpeta on hi ha el `docker-compose.yml`. Fes `cd` fins allà. |
 | La descàrrega es talla a mitges | Torna a executar `docker compose up -d`: continua per les capes que ja té, no comença de zero. |

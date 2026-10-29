@@ -12,3 +12,7 @@ code/PL1/*
 !code/PL1/.gitkeep
 code/PL2/*
 !code/PL2/.gitkeep
+
+# Material del professorat: solució de referència, fitxers [P] i informes.
+# NO es distribueix (el repo és públic).
+professorat/

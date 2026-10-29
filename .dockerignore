@@ -1,0 +1,6 @@
+# El contexte de build es l'arrel del repo, pero el Dockerfile nomes fa COPY de
+# quatre fitxers de docker/. Tota la resta nomes serveix per fer lent el build.
+.git
+.claude
+professorat
+code

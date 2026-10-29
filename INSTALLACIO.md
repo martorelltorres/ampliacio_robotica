@@ -15,7 +15,8 @@ una connexió normal). Fes-ho **amb temps, no el mateix dia de la primera pràct
 4. [Arrencar l'entorn](#4-arrencar-lentorn)
 5. [Verificar que tot funciona](#5-verificar-que-tot-funciona)
 6. [Primeres passes](#6-primeres-passes)
-7. [Si alguna cosa falla](#7-si-alguna-cosa-falla)
+7. [Actualitzar l'entorn](#7-actualitzar-lentorn) — **quan el professorat avisi**
+8. [Si alguna cosa falla](#8-si-alguna-cosa-falla)
 
 ---
 
@@ -213,7 +214,43 @@ repositori. **Guarda sempre la sortida sencera** si has de demanar ajuda al prof
 
 ---
 
-## 7. Si alguna cosa falla
+## 7. Actualitzar l'entorn
+
+De tant en tant el professorat publica una versió nova de la imatge, amb correccions o amb
+programari que necessita alguna pràctica. **Quan us avisi**, actualitza-la així, des de la
+carpeta `ampliacio_robotica`:
+
+```bash
+docker compose down
+git pull
+docker compose up -d
+```
+
+Si vas baixar el repositori com a ZIP en lloc de clonar-lo, `git pull` no et funcionarà:
+torna a baixar el ZIP i substitueix-hi el fitxer `docker-compose.yml`.
+
+Comprova que ha anat bé:
+
+```bash
+docker compose exec ros-dev selftest
+```
+
+La primera línia de la sortida diu quina versió de la imatge tens. Si has d'escriure al
+professorat per un problema, enganxa-la sempre.
+
+**Tres coses que convé saber:**
+
+- **No perds el teu codi.** La carpeta `code/` és al teu disc, no dins de la imatge.
+- **No es torna a baixar tota la imatge**, només les capes que han canviat: normalment
+  són un centenar de megues, no els 10 GB del primer dia.
+- **La imatge vella et queda ocupant disc.** Quan tot funcioni, la pots esborrar:
+  ```bash
+  docker image rm amt132/ampliacio_robotica:2026
+  ```
+
+---
+
+## 8. Si alguna cosa falla
 
 | Símptoma | Causa i solució |
 |---|---|
@@ -221,7 +258,7 @@ repositori. **Guarda sempre la sortida sencera** si has de demanar ajuda al prof
 | Docker Desktop no arrenca / es queda carregant | Reinicia l'ordinador. A Windows, comprova amb `wsl --status` que WSL2 funciona. |
 | `port is already allocated` | Ja tens un contenidor obert. `docker ps` per veure quin, i fes servir aquest. |
 | `no space left on device` | Menys de 12 GB lliures. Allibera espai; si has provat altres imatges Docker: `docker system prune -a`. |
-| `pull access denied` | Revisa que el `docker-compose.yml` digui exactament `amt132/ampliacio_robotica:2026` a la línia `image:`. Si és correcte, avisa el professorat. |
+| `pull access denied` | Revisa que el `docker-compose.yml` digui exactament `amt132/ampliacio_robotica:2026b` a la línia `image:`. Si és correcte, avisa el professorat. |
 | La carpeta compartida no es pot escriure (Linux) | `sudo chown -R 1000:1000 code` des del teu ordinador. |
 | Tot va molt lent (Mac amb xip Apple) | Comprova que has activat *"Use Rosetta for x86/amd64 emulation"* a Docker Desktop → Settings → General. |
 | `localhost:6080` no carrega res | Espera uns 15–20 s més; si segueix igual, `docker compose restart` i torna-ho a provar. |

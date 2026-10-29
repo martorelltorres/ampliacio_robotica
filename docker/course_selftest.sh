@@ -289,6 +289,16 @@ done
 command -v gzserver >/dev/null 2>&1 && c_ok "Gazebo instalado ($(gzserver --version 2>&1 | head -1))" \
     || c_bad "gzserver no encontrado" "no se puede simular el Kobuki sin robot físico"
 
+# Librerías de análisis offline: los scripts de analisi/ de PL1 las importan.
+# Sin ellas el alumno programa toda la práctica y se estrella en el último paso,
+# que es el peor momento para descubrirlo.
+for _lib in numpy pandas matplotlib; do
+    python3 -c "import ${_lib}" >/dev/null 2>&1 \
+        && c_ok "Python: ${_lib} $(python3 -c "import ${_lib}; print(${_lib}.__version__)" 2>/dev/null)" \
+        || c_bad "Python: falta ${_lib}" "los scripts de analisi/ de PL1 no funcionarán"
+done
+unset _lib
+
 # -----------------------------------------------------------------------------
 titulo "5. Stack submarino — COLA2 + Stonefish"
 # -----------------------------------------------------------------------------

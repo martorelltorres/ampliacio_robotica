@@ -4,3 +4,6 @@
 # la imagen del aula. Añade aqui lo que necesites, siempre con version.
 numpy==1.24.4
 matplotlib==3.7.5
+# pandas: analisi offline dels CSV generats a les practiques (PL1 apartats 3-5).
+# 2.0.3 es la ultima versio que publica rodes per a cp38.
+pandas==2.0.3
